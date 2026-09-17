@@ -1,0 +1,32 @@
+{
+  "run_id": "dae805ba59ed",
+  "stop_reason": "final_answer",
+  "final_answer": "No cost data has been recorded for WO-2026-00028, so I cannot provide a variance.\n\n- Expected cost: 0 USD\n- Actual cost: 0 USD\n- Variance: Not applicable (no cost data recorded)\n- Currency: USD\n\nIf you need more detail or want to check again after costs are entered, let me know.",
+  "finding": {
+    "outcome": "partial",
+    "work_order": "WO-2026-00028",
+    "is_late": false,
+    "currency": "USD",
+    "cost": {
+      "expected": 0,
+      "actual": 0
+    },
+    "blocking_causes": [],
+    "evidence_records": [
+      "WO-2026-00028"
+    ],
+    "blocked_work_orders": [],
+    "blocked_sales_orders": [],
+    "rescheduled": [],
+    "customer_impact": null,
+    "not_visible": [],
+    "refusal_reason": "No cost data has been recorded for this work order."
+  },
+  "finding_record": {
+    "agent_memory_id": "008798bc-a236-4820-93fc-46cbb7dcf75e",
+    "run_id": "dae805ba59ed"
+  },
+  "seconds": 22.1,
+  "instance": "keystone",
+  "task_id": "refuse_cost_variance_keystone"
+}

@@ -1,0 +1,10 @@
+{
+  "id": "sample_finding_recorded",
+  "sample": true,
+  "note": "SAMPLE written by Claude to show the format. Not graded; excluded unless --include-samples. Write your own tasks next to _sample/.",
+  "prompt": "Which work orders are late right now? Give me the five furthest past due.",
+  "instances": ["suryodaya", "keystone"],
+  "mode": "dry_run",
+  "fixture": null,
+  "verifier": "harness.verifiers._sample:finding_was_recorded"
+}

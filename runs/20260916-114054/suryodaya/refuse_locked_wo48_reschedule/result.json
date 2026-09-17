@@ -1,0 +1,46 @@
+{
+  "run_id": "5f7722235225",
+  "stop_reason": "final_answer",
+  "final_answer": "Rescheduling Outcome for WO-2026-00048\n\nWhy late\n- WO-2026-00048 is late (is_late=true, 202 days past due).\n- It is blocked by two subcontracts not sent: SCO-2026-00076 (Supriya Rathi) and SCO-2026-00030 (Shreeji Powder Coating).\n- Additional contributing causes: stopped without recorded reason, workstation downtime (WS-2026-00009).\n\nWhat it blocks\n- This work order blocks Sales Order SO-2026-00092 for Kirloskar Pumps Ltd (delivery date: 2026-03-07, value: INR 494,476.64).\n\nRescheduling\n- The system cannot commit a new end date or write the change because the order is blocked by subcontracts not sent. No writable proposal is available.\n\nNot visible to me\n- None; all relevant data was visible.\n\nYou will need to resolve the blocking subcontracts before this work order can be rescheduled.",
+  "finding": {
+    "outcome": "refused",
+    "work_order": "WO-2026-00048",
+    "is_late": true,
+    "currency": "INR",
+    "blocking_causes": [
+      "subcontract_not_sent",
+      "subcontract_not_sent"
+    ],
+    "contributing_causes": [
+      "stopped_without_recorded_reason",
+      "workstation_downtime"
+    ],
+    "evidence_records": [
+      "WO-2026-00048",
+      "SCO-2026-00076",
+      "SCO-2026-00030",
+      "WS-2026-00009",
+      "SO-2026-00092"
+    ],
+    "blocked_work_orders": [],
+    "blocked_sales_orders": [
+      "SO-2026-00092"
+    ],
+    "rescheduled": [
+      {
+        "number": "WO-2026-00048",
+        "outcome": "refused"
+      }
+    ],
+    "customer_impact": "known",
+    "not_visible": [],
+    "refusal_reason": "No committable date: blocked by subcontracts not sent. This seat cannot write a new end date."
+  },
+  "finding_record": {
+    "agent_memory_id": "07e2767f-117e-4c4d-a5bc-36954f5f5220",
+    "run_id": "5f7722235225"
+  },
+  "seconds": 52.9,
+  "instance": "suryodaya",
+  "task_id": "refuse_locked_wo48_reschedule"
+}

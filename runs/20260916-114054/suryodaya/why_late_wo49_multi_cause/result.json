@@ -1,0 +1,52 @@
+{
+  "run_id": "62775c32ecdc",
+  "stop_reason": "final_answer",
+  "final_answer": "WO-2026-00049 (Pump Base Frame) is late.\n\nWhy late\n- The main blocking cause is a subcontract not sent (SCO-2026-00024), so there is no known ready date.\n- Other contributing issues: the work order is stopped without a recorded reason, two material requests are open and overdue (MR-2026-00065, MR-2026-00054), and there has been significant workstation downtime (WS-2026-00008, WS-2026-00009).\n- I do not have access to JobCard or DowntimeEntry records, so I cannot provide further detail on those aspects.\n\nWhat it blocks\n- This work order blocks Sales Order SO-2026-00100 for Kirloskar Pumps Ltd, delivery date 2026-03-20, value INR 533,746.10. No other work orders are blocked.\n\nRescheduling\n- Rescheduling is not possible: the order is blocked by a subcontract not sent, so no committable new date can be set.\n\nNot visible to me\n- JobCard and DowntimeEntry records are not visible to this seat.\n\nIf you need more detail on the subcontract or material requests, let me know.",
+  "finding": {
+    "outcome": "answered",
+    "work_order": "WO-2026-00049",
+    "is_late": true,
+    "currency": "INR",
+    "blocking_causes": [
+      "subcontract_not_sent"
+    ],
+    "contributing_causes": [
+      "stopped_without_recorded_reason",
+      "material_request_open",
+      "workstation_downtime"
+    ],
+    "evidence_records": [
+      "WO-2026-00049",
+      "SCO-2026-00024",
+      "MR-2026-00065",
+      "MR-2026-00054",
+      "WS-2026-00008",
+      "WS-2026-00009"
+    ],
+    "blocked_work_orders": [],
+    "blocked_sales_orders": [
+      "SO-2026-00100"
+    ],
+    "rescheduled": [
+      {
+        "number": "WO-2026-00049",
+        "new_start": null,
+        "new_end": null,
+        "outcome": "refused"
+      }
+    ],
+    "customer_impact": "known",
+    "not_visible": [
+      "JobCard",
+      "DowntimeEntry"
+    ],
+    "refusal_reason": null
+  },
+  "finding_record": {
+    "agent_memory_id": "7d3eb1a3-032a-4abb-9a33-e65928f36f9a",
+    "run_id": "62775c32ecdc"
+  },
+  "seconds": 52.5,
+  "instance": "suryodaya",
+  "task_id": "why_late_wo49_multi_cause"
+}

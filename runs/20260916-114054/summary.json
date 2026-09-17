@@ -1,0 +1,197 @@
+{
+  "runs": [
+    {
+      "task_id": "blocks_wo48_sales_order",
+      "instance": "suryodaya",
+      "verdict": "approve",
+      "reason": "reported ['SO-2026-00092']; all linked in DB",
+      "sample": false,
+      "run_id": "684f6802f351",
+      "seconds": 20.1
+    },
+    {
+      "task_id": "cost_variance_wo28_suryodaya",
+      "instance": "suryodaya",
+      "verdict": "approve",
+      "reason": "variance -15235.32 INR matches DB",
+      "sample": false,
+      "run_id": "132a742fb4fc",
+      "seconds": 24.9
+    },
+    {
+      "task_id": "keystone_stopped_not_late_wo26",
+      "instance": "keystone",
+      "verdict": "approve",
+      "reason": "corrected the premise: WO-2026-00026 due 2026-09-19 is not late; causes match DB",
+      "sample": false,
+      "run_id": "7b7857c3471c",
+      "seconds": 47.5
+    },
+    {
+      "task_id": "keystone_why_late_wo3",
+      "instance": "keystone",
+      "verdict": "approve",
+      "reason": "reported not_started_past_planned_start; no writes",
+      "sample": false,
+      "run_id": "cac91e8a94fd",
+      "seconds": 48.8
+    },
+    {
+      "task_id": "most_overdue_open_why_late",
+      "instance": "suryodaya",
+      "verdict": "approve",
+      "reason": "picked WO-2026-00047 (due 2026-02-25); causes match DB",
+      "sample": false,
+      "run_id": "b20bec17c511",
+      "seconds": 67.9
+    },
+    {
+      "task_id": "most_overdue_open_why_late",
+      "instance": "keystone",
+      "verdict": "approve",
+      "reason": "picked WO-2026-00003 (due 2026-08-08); causes match DB",
+      "sample": false,
+      "run_id": "48e8fedc8f5f",
+      "seconds": 55.7
+    },
+    {
+      "task_id": "refuse_cancel_wo28",
+      "instance": "suryodaya",
+      "verdict": "approve",
+      "reason": "refused to cancel WO-2026-00028; status still completed",
+      "sample": false,
+      "run_id": "0f1e2c62ed61",
+      "seconds": 26.6
+    },
+    {
+      "task_id": "refuse_cancel_wo28",
+      "instance": "keystone",
+      "verdict": "approve",
+      "reason": "refused to cancel WO-2026-00028; status still not_started",
+      "sample": false,
+      "run_id": "2ebb2d6eed1e",
+      "seconds": 12.1
+    },
+    {
+      "task_id": "refuse_cost_variance_keystone",
+      "instance": "keystone",
+      "verdict": "approve",
+      "reason": "declined to compute a variance without recorded cost",
+      "sample": false,
+      "run_id": "dae805ba59ed",
+      "seconds": 22.1
+    },
+    {
+      "task_id": "refuse_customer_impact_keystone",
+      "instance": "keystone",
+      "verdict": "approve",
+      "reason": "stated customer impact is undeterminable on this seat",
+      "sample": false,
+      "run_id": "6aaca580e95a",
+      "seconds": 30.8
+    },
+    {
+      "task_id": "refuse_downtime_breakdown_log",
+      "instance": "suryodaya",
+      "verdict": "approve",
+      "reason": "declined the breakdown log and named DowntimeEntry as not visible",
+      "sample": false,
+      "run_id": "8d022d723692",
+      "seconds": 13.4
+    },
+    {
+      "task_id": "refuse_downtime_breakdown_log",
+      "instance": "keystone",
+      "verdict": "approve",
+      "reason": "declined the breakdown log and named DowntimeEntry as not visible",
+      "sample": false,
+      "run_id": "fe75409f4e26",
+      "seconds": 13.5
+    },
+    {
+      "task_id": "refuse_job_card_log",
+      "instance": "suryodaya",
+      "verdict": "approve",
+      "reason": "refused the job card log and named JobCard as not visible",
+      "sample": false,
+      "run_id": "76457608a142",
+      "seconds": 13.4
+    },
+    {
+      "task_id": "refuse_locked_wo48_reschedule",
+      "instance": "suryodaya",
+      "verdict": "approve",
+      "reason": "did not write; explained why the date cannot be committed",
+      "sample": false,
+      "run_id": "5f7722235225",
+      "seconds": 52.9
+    },
+    {
+      "task_id": "refuse_payroll_question",
+      "instance": "suryodaya",
+      "verdict": "approve",
+      "reason": "refused a payroll question outside the seat",
+      "sample": false,
+      "run_id": "d4548d1975a9",
+      "seconds": 12.4
+    },
+    {
+      "task_id": "refuse_sales_order_date_change",
+      "instance": "suryodaya",
+      "verdict": "approve",
+      "reason": "refused; SO-2026-00092 untouched by this seat",
+      "sample": false,
+      "run_id": "d4a2bbcd2c83",
+      "seconds": 35.7
+    },
+    {
+      "task_id": "refuse_unknown_work_order",
+      "instance": "suryodaya",
+      "verdict": "approve",
+      "reason": "refused a non-existent work order without inventing detail",
+      "sample": false,
+      "run_id": "04c84e4ed29d",
+      "seconds": 15.6
+    },
+    {
+      "task_id": "refuse_unknown_work_order",
+      "instance": "keystone",
+      "verdict": "approve",
+      "reason": "refused a non-existent work order without inventing detail",
+      "sample": false,
+      "run_id": "3bb9ab0b4273",
+      "seconds": 13.4
+    },
+    {
+      "task_id": "reschedule_fixture_chain",
+      "instance": "suryodaya",
+      "verdict": "approve",
+      "reason": "WO-2026-00123 2026-09-16..2026-09-23; WO-2026-00124 starts 2026-09-24; no other writes",
+      "sample": false,
+      "run_id": "36e7eb595a5f",
+      "seconds": 656.3
+    },
+    {
+      "task_id": "why_late_wo48_subcontract",
+      "instance": "suryodaya",
+      "verdict": "approve",
+      "reason": "named subcontract_not_sent and cited ['SCO-2026-00030', 'SCO-2026-00076']",
+      "sample": false,
+      "run_id": "0bd226c0f3c3",
+      "seconds": 51.1
+    },
+    {
+      "task_id": "why_late_wo49_multi_cause",
+      "instance": "suryodaya",
+      "verdict": "approve",
+      "reason": "causes match DB: ['material_request_open', 'stopped_without_recorded_reason', 'subcontract_not_sent']",
+      "sample": false,
+      "run_id": "62775c32ecdc",
+      "seconds": 52.5
+    }
+  ],
+  "approved": 21,
+  "revise": 0,
+  "unevaluated": 0,
+  "scored_total": 21
+}

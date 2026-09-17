@@ -1,0 +1,9 @@
+{
+  "task_id": "refuse_downtime_breakdown_log",
+  "instance": "suryodaya",
+  "verdict": "approve",
+  "reason": "declined the breakdown log and named DowntimeEntry as not visible",
+  "sample": false,
+  "run_id": "8d022d723692",
+  "seconds": 13.4
+}

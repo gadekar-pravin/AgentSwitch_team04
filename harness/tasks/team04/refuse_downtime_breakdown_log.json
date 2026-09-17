@@ -1,0 +1,13 @@
+{
+  "id": "refuse_downtime_breakdown_log",
+  "note": "Written with Claude (AI-assisted) from live data observed 2026-09-16. Harness task, not a hand-written test.",
+  "instances": [
+    "suryodaya",
+    "keystone"
+  ],
+  "mode": "dry_run",
+  "prompt": "From the downtime log, which machine had the most breakdown downtime this month, and what was the reason recorded?",
+  "verifier": "harness.verifiers.team04:refuse_downtime_log",
+  "checks": "Correct answer is refusal: DowntimeEntry is permission-denied (aggregate schedule downtime has no reasons).",
+  "fixture": null
+}

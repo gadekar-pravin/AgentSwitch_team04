@@ -1,0 +1,67 @@
+{
+  "me": "07e59353-a7ba-47b5-bb9c-87a24cac350e",
+  "started_at_utc": "2026-09-16T16:46:24",
+  "snapshot": {
+    "WO-2026-00028": {
+      "id": "9c8be814-dc4e-4c14-8420-01f3c2a5ea13",
+      "number": "WO-2026-00028",
+      "item_id": "e3e18cd3-d607-4b57-a665-867e041ca46b",
+      "bom_id": "ab1c7c63-1861-4f01-b2c7-529f9860d289",
+      "sales_order_id": "81c062f5-7466-4ef5-b6ac-63e6166c12ae",
+      "company_id": "d5e0c630-2f49-4e5f-b21a-1f6783c767b7",
+      "design_file_id": "0b27f19f-18d8-42fd-a92f-2e4d0456d5e0",
+      "production_plan_id": null,
+      "project_id": "61ee3506-5521-4743-938a-20ff149327f7",
+      "production_strategy": "make_to_order",
+      "qty": 90.0,
+      "produced_qty": 0.0,
+      "scrap_qty": 0.0,
+      "planned_start_date": "2026-09-26",
+      "planned_end_date": "2026-10-31",
+      "actual_start_date": null,
+      "actual_end_date": null,
+      "target_warehouse_id": "ac3f3e41-487e-4c27-8404-7317c545357f",
+      "source_warehouse_id": "667c626d-7f86-421b-baad-0ba216109dd7",
+      "priority": "medium",
+      "expected_cost": 0.0,
+      "actual_cost": 0.0,
+      "total_operation_time": 0.0,
+      "actual_operation_time": 0.0,
+      "quality_inspection_required": 1,
+      "wip_account": "Work In Progress",
+      "notes": "Q4 blanket release, scheduled into the weld cell.",
+      "status": "not_started",
+      "approval_status": "approved",
+      "docstatus": 1,
+      "created_at": "2026-09-05T04:24:03.649862",
+      "updated_at": "2026-09-05T04:24:03.726583",
+      "created_by": null,
+      "updated_by": null,
+      "scrap_warehouse_id": null,
+      "_item_id_display": "Grain Cart Ladder Guard Weldment",
+      "_bom_id_display": "FG-GRD-1150 rev A",
+      "_company_id_display": "Keystone Precision Works LLC",
+      "_design_file_id_display": "Grain Cart Ladder Guard \u2014 Weldment",
+      "_project_id_display": "Grain Cart Ladder Guard \u2014 Weldment Program",
+      "_target_warehouse_id_display": "Finished Goods",
+      "_source_warehouse_id_display": "Raw Stores",
+      "_display": "WO-2026-00028",
+      "_transitions": [
+        {
+          "action": "Start Production",
+          "to": "in_progress",
+          "from": "not_started"
+        },
+        {
+          "action": "Cancel",
+          "to": "cancelled",
+          "from": "not_started"
+        }
+      ],
+      "_permissions": {
+        "write": true,
+        "delete": false
+      }
+    }
+  }
+}

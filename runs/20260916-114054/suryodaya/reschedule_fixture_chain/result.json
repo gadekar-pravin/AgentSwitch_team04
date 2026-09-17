@@ -1,0 +1,103 @@
+{
+  "run_id": "36e7eb595a5f",
+  "stop_reason": "final_answer",
+  "final_answer": "WO-2026-00123: Late Work Order Analysis and Actions\n\nWhy late\n- WO-2026-00123 is late (is_late=true, 3 days past planned end).\n- The only contributing cause is that it is not released (\"not_released\", WO-2026-00123). There are no blocking causes\u2014so it can be rescheduled and started.\n\nWhat it blocks\n- This work order blocks 13 downstream work orders, including WO-2026-00124, WO-2026-00110, WO-2026-00095, WO-2026-00080, WO-2026-00065, WO-2026-00112, WO-2026-00107, and others.\n- It also blocks at least 8 sales orders, including:\n  - SO-2026-00027, SO-2026-00192, SO-2026-00187, SO-2026-00056 (Tata Ficosa Automotive Systems)\n  - SO-2026-00053, SO-2026-00198, SO-2026-00164, SO-2026-00039 (Kirloskar Pumps Ltd)\n- Customer impact is partly unknown because some work orders are make-to-order without a linked sales order.\n\nRescheduling\n- WO-2026-00123: Rescheduled to start 2026-09-16, end 2026-09-23 (applied).\n- WO-2026-00124: Rescheduled to start 2026-09-24, end 2026-09-27 (applied).\n- WO-2026-00110, WO-2026-00112, WO-2026-00107: Reschedule proposals were not approved (dates not changed).\n\nNot visible to me\n- JobCard and DowntimeEntry details are not visible to this seat.\n\nIf you need further action on the downstream work orders that could not be rescheduled, an admin will need to unlock or cancel them first.",
+  "finding": {
+    "outcome": "answered",
+    "work_order": "WO-2026-00123",
+    "is_late": true,
+    "currency": "INR",
+    "blocking_causes": [],
+    "contributing_causes": [
+      "not_released"
+    ],
+    "evidence_records": [
+      "WO-2026-00123",
+      "WO-2026-00124",
+      "WO-2026-00110",
+      "WO-2026-00095",
+      "WO-2026-00080",
+      "WO-2026-00065",
+      "WO-2026-00112",
+      "WO-2026-00107",
+      "WO-2026-00097",
+      "WO-2026-00092",
+      "WO-2026-00082",
+      "WO-2026-00077",
+      "WO-2026-00067",
+      "WO-2026-00062",
+      "WO-2026-00052"
+    ],
+    "blocked_work_orders": [
+      "WO-2026-00124",
+      "WO-2026-00110",
+      "WO-2026-00095",
+      "WO-2026-00080",
+      "WO-2026-00065",
+      "WO-2026-00112",
+      "WO-2026-00107",
+      "WO-2026-00097",
+      "WO-2026-00092",
+      "WO-2026-00082",
+      "WO-2026-00077",
+      "WO-2026-00067",
+      "WO-2026-00062",
+      "WO-2026-00052"
+    ],
+    "blocked_sales_orders": [
+      "SO-2026-00027",
+      "SO-2026-00192",
+      "SO-2026-00187",
+      "SO-2026-00056",
+      "SO-2026-00053",
+      "SO-2026-00198",
+      "SO-2026-00164",
+      "SO-2026-00039"
+    ],
+    "rescheduled": [
+      {
+        "number": "WO-2026-00123",
+        "new_start": "2026-09-16",
+        "new_end": "2026-09-23",
+        "outcome": "applied"
+      },
+      {
+        "number": "WO-2026-00124",
+        "new_start": "2026-09-24",
+        "new_end": "2026-09-27",
+        "outcome": "applied"
+      },
+      {
+        "number": "WO-2026-00110",
+        "new_start": "2026-09-24",
+        "new_end": "2026-10-05",
+        "outcome": "not_approved"
+      },
+      {
+        "number": "WO-2026-00112",
+        "new_start": "2026-09-28",
+        "new_end": "2026-10-10",
+        "outcome": "not_approved"
+      },
+      {
+        "number": "WO-2026-00107",
+        "new_start": "2026-09-28",
+        "new_end": "2026-10-04",
+        "outcome": "not_approved"
+      }
+    ],
+    "customer_impact": "partly unknown: make-to-order without a linked sales order: WO-2026-00123, WO-2026-00124",
+    "not_visible": [
+      "JobCard",
+      "DowntimeEntry"
+    ],
+    "refusal_reason": null
+  },
+  "finding_record": {
+    "agent_memory_id": "d240fbc3-ea5b-408b-9f05-926495ec8829",
+    "run_id": "36e7eb595a5f"
+  },
+  "seconds": 656.3,
+  "instance": "suryodaya",
+  "task_id": "reschedule_fixture_chain"
+}

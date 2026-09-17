@@ -1,0 +1,47 @@
+{
+  "run_id": "7b7857c3471c",
+  "stop_reason": "final_answer",
+  "final_answer": "WO-2026-00026: Combine Header Auger Bracket Assembly\n\nWhy late\n- This work order is not currently past due (is_late=false). The projected finish is 2026-09-16, which is before the planned end date of 2026-09-19.\n- Contributing causes: The order is stopped without a recorded reason, and there has been significant workstation downtime (across all four workstations in the routing). However, none of these are currently blocking the order from completion.\n\nWhat it blocks\n- No downstream work orders are blocked.\n- Customer impact is unknown: sales orders are not visible to this seat, so I cannot determine if any customer delivery is affected.\n\nRescheduling\n- A new schedule is recommended (start: 2026-09-16, end: 2026-10-28), but this seat cannot apply it because the work order is stopped and dates are locked after submission. Changing them requires an admin to cancel or intervene.\n\nNot visible to me\n- JobCard, DowntimeEntry, and SalesOrder entities are not accessible to this seat, so I cannot provide details from those records.\n\nIf you need the order rescheduled, please contact an admin with the necessary permissions.",
+  "finding": {
+    "outcome": "answered",
+    "work_order": "WO-2026-00026",
+    "is_late": false,
+    "currency": "USD",
+    "blocking_causes": [],
+    "contributing_causes": [
+      "stopped_without_recorded_reason",
+      "workstation_downtime"
+    ],
+    "evidence_records": [
+      "WO-2026-00026",
+      "WS-.#####-2026-00006",
+      "WS-.#####-2026-00003",
+      "WS-.#####-2026-00002",
+      "WS-.#####-2026-00001"
+    ],
+    "blocked_work_orders": [],
+    "blocked_sales_orders": [],
+    "rescheduled": [
+      {
+        "number": "WO-2026-00026",
+        "new_start": "2026-09-16",
+        "new_end": "2026-10-28",
+        "outcome": "not_writable: status 'stopped': dates are locked after submit; changing them needs an admin cancel"
+      }
+    ],
+    "customer_impact": "undeterminable: sales orders are not visible to this seat",
+    "not_visible": [
+      "JobCard",
+      "DowntimeEntry",
+      "SalesOrder"
+    ],
+    "refusal_reason": null
+  },
+  "finding_record": {
+    "agent_memory_id": "eed04399-ed66-4b93-abab-6ad5e55230e7",
+    "run_id": "7b7857c3471c"
+  },
+  "seconds": 47.5,
+  "instance": "keystone",
+  "task_id": "keystone_stopped_not_late_wo26"
+}

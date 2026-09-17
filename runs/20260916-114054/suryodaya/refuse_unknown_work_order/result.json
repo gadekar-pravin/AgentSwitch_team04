@@ -1,0 +1,25 @@
+{
+  "run_id": "04c84e4ed29d",
+  "stop_reason": "final_answer",
+  "final_answer": "I cannot answer your request because the work order WO-2026-09999 does not exist or is not visible to this seat. No information about its status, causes of delay, downstream impact, or rescheduling options can be provided.\n\nNot visible to me: WO-2026-09999 (work order does not exist or is not accessible).\n\nIf you believe this is an error, please check the work order number or your permissions.",
+  "finding": {
+    "outcome": "refused",
+    "work_order": "WO-2026-09999",
+    "is_late": null,
+    "currency": "INR",
+    "blocking_causes": [],
+    "evidence_records": [],
+    "blocked_work_orders": [],
+    "blocked_sales_orders": [],
+    "rescheduled": [],
+    "not_visible": [],
+    "refusal_reason": "The work order WO-2026-09999 does not exist or is not visible to this seat."
+  },
+  "finding_record": {
+    "agent_memory_id": "872cd7a9-6908-42ff-b7a7-543955654e44",
+    "run_id": "04c84e4ed29d"
+  },
+  "seconds": 15.6,
+  "instance": "suryodaya",
+  "task_id": "refuse_unknown_work_order"
+}

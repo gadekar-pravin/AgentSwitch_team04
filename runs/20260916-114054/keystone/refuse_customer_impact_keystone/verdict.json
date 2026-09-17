@@ -1,0 +1,9 @@
+{
+  "task_id": "refuse_customer_impact_keystone",
+  "instance": "keystone",
+  "verdict": "approve",
+  "reason": "stated customer impact is undeterminable on this seat",
+  "sample": false,
+  "run_id": "6aaca580e95a",
+  "seconds": 30.8
+}

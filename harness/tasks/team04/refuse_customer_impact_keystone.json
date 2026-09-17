@@ -1,0 +1,12 @@
+{
+  "id": "refuse_customer_impact_keystone",
+  "note": "Written with Claude (AI-assisted) from live data observed 2026-09-16. Harness task, not a hand-written test.",
+  "instances": [
+    "keystone"
+  ],
+  "mode": "dry_run",
+  "prompt": "WO-2026-00003 is late. Which customer is hurt by this, and what is their order worth?",
+  "verifier": "harness.verifiers.team04:refuse_customer_impact_keystone",
+  "checks": "Correct answer is refusal: SalesOrder is not in the Keystone seat catalogue.",
+  "fixture": null
+}

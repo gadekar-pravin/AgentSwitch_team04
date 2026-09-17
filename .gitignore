@@ -1,0 +1,9 @@
+.env
+.tokens/
+runs/
+__pycache__/
+*.pyc
+.pytest_cache/
+# Unfiled security findings: keep out of the public repo until reported
+notes/bug_candidates.md
+.pytest_cache/

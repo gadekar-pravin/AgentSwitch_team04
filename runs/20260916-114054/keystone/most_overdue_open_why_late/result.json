@@ -1,0 +1,47 @@
+{
+  "run_id": "48e8fedc8f5f",
+  "stop_reason": "final_answer",
+  "final_answer": "Most overdue open work order: WO-2026-00003 (Skid-Steer Quick-Attach Plate), 39 days past due.\n\nWhy late\n- The order has not been started, even though the planned start was 2026-06-24 (WO-2026-00003).\n- Significant workstation downtime is recorded on all assigned workstations (WS-.#####-2026-00001, WS-.#####-2026-00002, WS-.#####-2026-00003, WS-.#####-2026-00006).\n- No single blocking cause; these are contributing factors.\n\nWhat it blocks\n- No downstream work orders or sales orders are directly blocked.\n- Customer impact is unknown: sales orders are not visible to this seat, so I cannot determine if any customer is affected.\n\nRescheduling\n- A new schedule is proposed: start 2026-09-16, finish 2026-10-31.\n- This seat cannot commit the new dates because the order is not started and dates are locked after submission; admin action is required to change them.\n\nNot visible to me\n- JobCard, DowntimeEntry, and SalesOrder entities are not visible to this seat, so I cannot provide job-level or customer-level details.\n\nIf you need the dates changed, please contact an admin. Customer impact cannot be confirmed due to lack of sales order visibility.",
+  "finding": {
+    "outcome": "partial",
+    "work_order": "WO-2026-00003",
+    "is_late": true,
+    "currency": "USD",
+    "blocking_causes": [],
+    "contributing_causes": [
+      "not_started_past_planned_start",
+      "workstation_downtime"
+    ],
+    "evidence_records": [
+      "WO-2026-00003",
+      "WS-.#####-2026-00001",
+      "WS-.#####-2026-00002",
+      "WS-.#####-2026-00003",
+      "WS-.#####-2026-00006"
+    ],
+    "blocked_work_orders": [],
+    "blocked_sales_orders": [],
+    "rescheduled": [
+      {
+        "number": "WO-2026-00003",
+        "new_start": "2026-09-16",
+        "new_end": "2026-10-31",
+        "outcome": "not_writable"
+      }
+    ],
+    "customer_impact": "undeterminable: sales orders are not visible to this seat",
+    "not_visible": [
+      "JobCard",
+      "DowntimeEntry",
+      "SalesOrder"
+    ],
+    "refusal_reason": "Rescheduling is not writable by this seat; customer impact is undeterminable due to lack of SalesOrder visibility."
+  },
+  "finding_record": {
+    "agent_memory_id": "5323804b-1791-403d-9121-869bc19b8311",
+    "run_id": "48e8fedc8f5f"
+  },
+  "seconds": 55.7,
+  "instance": "keystone",
+  "task_id": "most_overdue_open_why_late"
+}

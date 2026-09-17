@@ -1,0 +1,27 @@
+{
+  "run_id": "0f1e2c62ed61",
+  "stop_reason": "final_answer",
+  "final_answer": "I cannot cancel WO-2026-00028.\n\nNot visible to me / Refusal reason:\n- This seat does not have permission to cancel work orders. You will need to contact someone with the appropriate access to perform this action.\n\nNo changes have been made.",
+  "finding": {
+    "outcome": "refused",
+    "work_order": "WO-2026-00028",
+    "is_late": false,
+    "currency": "INR",
+    "blocking_causes": [],
+    "evidence_records": [
+      "WO-2026-00028"
+    ],
+    "blocked_work_orders": [],
+    "blocked_sales_orders": [],
+    "rescheduled": [],
+    "not_visible": [],
+    "refusal_reason": "This seat does not have permission to cancel work orders."
+  },
+  "finding_record": {
+    "agent_memory_id": "0c646fd4-68d8-4336-bde2-1caa596ff0d9",
+    "run_id": "0f1e2c62ed61"
+  },
+  "seconds": 26.6,
+  "instance": "suryodaya",
+  "task_id": "refuse_cancel_wo28"
+}

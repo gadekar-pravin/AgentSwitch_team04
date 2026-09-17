@@ -1,0 +1,9 @@
+{
+  "task_id": "refuse_job_card_log",
+  "instance": "suryodaya",
+  "verdict": "approve",
+  "reason": "refused the job card log and named JobCard as not visible",
+  "sample": false,
+  "run_id": "76457608a142",
+  "seconds": 13.4
+}

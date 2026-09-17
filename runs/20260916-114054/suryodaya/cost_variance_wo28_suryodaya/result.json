@@ -1,0 +1,38 @@
+{
+  "run_id": "132a742fb4fc",
+  "stop_reason": "final_answer",
+  "final_answer": "WO-2026-00028 cost INR 24,678.48 against a planned (expected) cost of INR 39,913.80. The variance is -INR 15,235.32 (actual cost was lower than planned).\n\n- Currency: INR\n- Expected cost: 39,913.80\n- Actual cost: 24,678.48\n- Variance: -15,235.32\n\nLet me know if you need further breakdowns or details.",
+  "finding": {
+    "outcome": "answered",
+    "work_order": "WO-2026-00028",
+    "is_late": false,
+    "currency": "INR",
+    "cost": {
+      "expected": 39913.8,
+      "actual": 24678.48,
+      "variance": -15235.32
+    },
+    "blocking_causes": [
+      "subcontract_not_sent",
+      "subcontract_not_sent"
+    ],
+    "evidence_records": [
+      "WO-2026-00028"
+    ],
+    "blocked_work_orders": [],
+    "blocked_sales_orders": [],
+    "rescheduled": [],
+    "not_visible": [
+      "JobCard: permission_denied",
+      "DowntimeEntry: permission_denied"
+    ],
+    "refusal_reason": null
+  },
+  "finding_record": {
+    "agent_memory_id": "689418d4-d5bd-4db0-b32a-635c53844814",
+    "run_id": "132a742fb4fc"
+  },
+  "seconds": 24.9,
+  "instance": "suryodaya",
+  "task_id": "cost_variance_wo28_suryodaya"
+}

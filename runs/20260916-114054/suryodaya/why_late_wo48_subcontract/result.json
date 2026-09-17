@@ -1,0 +1,51 @@
+{
+  "run_id": "0bd226c0f3c3",
+  "stop_reason": "final_answer",
+  "final_answer": "Here is the status for work order WO-2026-00048:\n\nWhy late\n- This work order is late (is_late=true, 202 days past due).\n- Blocking causes: Two subcontracts have not been sent (SCO-2026-00076 to Supriya Rathi, SCO-2026-00030 to Shreeji Powder Coating). These are blocking progress and there is no known ready date.\n- Contributing causes: The work order is stopped without a recorded reason (WO-2026-00048) and there has been workstation downtime (WS-2026-00009).\n- I do not have access to JobCard or DowntimeEntry details.\n\nWhat it blocks\n- This work order blocks Sales Order SO-2026-00092 for customer Kirloskar Pumps Ltd, delivery date 2026-03-07, value INR 494,476.64. The order is undelivered and confirmed.\n\nRescheduling\n- No rescheduling can be committed because the work order is blocked by subcontracts that have not been sent. There is no committable new date.\n\nNot visible to me\n- JobCard and DowntimeEntry records are not visible to this seat.\n\nLet me know if you need further details or want to escalate the subcontract issue.",
+  "finding": {
+    "outcome": "answered",
+    "work_order": "WO-2026-00048",
+    "is_late": true,
+    "currency": "INR",
+    "blocking_causes": [
+      "subcontract_not_sent",
+      "subcontract_not_sent"
+    ],
+    "contributing_causes": [
+      "stopped_without_recorded_reason",
+      "workstation_downtime"
+    ],
+    "evidence_records": [
+      "WO-2026-00048",
+      "SCO-2026-00076",
+      "SCO-2026-00030",
+      "WS-2026-00009",
+      "SO-2026-00092"
+    ],
+    "blocked_work_orders": [],
+    "blocked_sales_orders": [
+      "SO-2026-00092"
+    ],
+    "rescheduled": [
+      {
+        "number": "WO-2026-00048",
+        "new_start": null,
+        "new_end": null,
+        "outcome": "no committable date: subcontract_not_sent"
+      }
+    ],
+    "customer_impact": "known",
+    "not_visible": [
+      "JobCard",
+      "DowntimeEntry"
+    ],
+    "refusal_reason": null
+  },
+  "finding_record": {
+    "agent_memory_id": "aa222687-6c6c-4add-aa47-2ae290327e0f",
+    "run_id": "0bd226c0f3c3"
+  },
+  "seconds": 51.1,
+  "instance": "suryodaya",
+  "task_id": "why_late_wo48_subcontract"
+}

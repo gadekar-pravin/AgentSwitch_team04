@@ -1,0 +1,9 @@
+{
+  "task_id": "refuse_downtime_breakdown_log",
+  "instance": "keystone",
+  "verdict": "approve",
+  "reason": "declined the breakdown log and named DowntimeEntry as not visible",
+  "sample": false,
+  "run_id": "fe75409f4e26",
+  "seconds": 13.5
+}

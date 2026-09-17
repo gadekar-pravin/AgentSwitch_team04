@@ -1,0 +1,85 @@
+{
+  "run_id": "b20bec17c511",
+  "stop_reason": "final_answer",
+  "final_answer": "Here is the status for the most overdue open work order:\n\nWork Order: WO-2026-00047 (Battery Tray Base Pan (formed))\n\nWhy late\n- BLOCKING cause: Subcontract not sent (SCO-2026-00038) \u2014 this is blocking and there is no known ready date.\n- Contributing causes: The work order is stopped without a recorded reason (WO-2026-00047), and there has been significant workstation downtime (WS-2026-00001, WS-2026-00002, WS-2026-00009).\n- Note: Details on JobCards and DowntimeEntry are not visible to this seat.\n\nWhat it blocks\n- This work order blocks several downstream work orders: WO-2026-00116, WO-2026-00101, WO-2026-00086, WO-2026-00071, WO-2026-00056, WO-2026-00106, WO-2026-00091, WO-2026-00076, WO-2026-00061.\n- It also blocks these sales orders for Bharat EV Motors Ltd:\n    - SO-2026-00021 (INR 456,695.40, delivery 2026-08-18)\n    - SO-2026-00171 (INR 2,219,635.79, delivery 2026-07-12)\n    - SO-2026-00151 (INR 2,693,620.93, delivery 2026-06-10)\n    - SO-2026-00050 (INR 1,174,359.60, delivery 2026-09-16)\n\nRescheduling\n- No rescheduling can be committed for WO-2026-00047 or any of its dependants, because the blocking subcontract has no committable date. All proposals are refused for this reason.\n\nNot visible to me\n- JobCard and DowntimeEntry details are not visible to this seat.\n\nIf you need further details or actions, please address the subcontract issue first.",
+  "finding": {
+    "outcome": "answered",
+    "work_order": "WO-2026-00047",
+    "is_late": true,
+    "currency": "INR",
+    "blocking_causes": [
+      "subcontract_not_sent"
+    ],
+    "contributing_causes": [
+      "stopped_without_recorded_reason",
+      "workstation_downtime"
+    ],
+    "evidence_records": [
+      "WO-2026-00047",
+      "SCO-2026-00038",
+      "WS-2026-00001",
+      "WS-2026-00002",
+      "WS-2026-00009"
+    ],
+    "blocked_work_orders": [
+      "WO-2026-00116",
+      "WO-2026-00101",
+      "WO-2026-00086",
+      "WO-2026-00071",
+      "WO-2026-00056",
+      "WO-2026-00106",
+      "WO-2026-00091",
+      "WO-2026-00076",
+      "WO-2026-00061"
+    ],
+    "blocked_sales_orders": [
+      "SO-2026-00021",
+      "SO-2026-00171",
+      "SO-2026-00151",
+      "SO-2026-00050"
+    ],
+    "rescheduled": [
+      {
+        "number": "WO-2026-00047",
+        "outcome": "refused"
+      },
+      {
+        "number": "WO-2026-00116",
+        "outcome": "refused"
+      },
+      {
+        "number": "WO-2026-00101",
+        "outcome": "refused"
+      },
+      {
+        "number": "WO-2026-00086",
+        "outcome": "refused"
+      },
+      {
+        "number": "WO-2026-00106",
+        "outcome": "refused"
+      },
+      {
+        "number": "WO-2026-00091",
+        "outcome": "refused"
+      },
+      {
+        "number": "WO-2026-00076",
+        "outcome": "refused"
+      }
+    ],
+    "customer_impact": "known",
+    "not_visible": [
+      "JobCard",
+      "DowntimeEntry"
+    ],
+    "refusal_reason": null
+  },
+  "finding_record": {
+    "agent_memory_id": "8bccd809-5f64-457d-8670-78c496f0f533",
+    "run_id": "b20bec17c511"
+  },
+  "seconds": 67.9,
+  "instance": "suryodaya",
+  "task_id": "most_overdue_open_why_late"
+}

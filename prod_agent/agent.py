@@ -1,0 +1,185 @@
+"""The agent loop. No framework: messages in, tool calls out, every event traced."""
+import json
+import time
+import traceback
+import uuid
+from typing import Callable
+
+from . import config, domain
+from .mcp_client import McpClient, McpError
+
+SYSTEM_PROMPT = """You are the Production agent for a manufacturing company on the AgentSwitch platform.
+Your seat owns work orders, BOMs, routings and job cards. You answer planners' questions from live data.
+
+How you work:
+- Use tools for every fact. Never state a number, date, record, customer or cause you did not get from a tool result in this conversation.
+- Cite record numbers (WO-..., SCO-..., MR-..., SO-...) for every claim.
+- Call company_context first. Use its currency and country; never assume a country, tax regime or currency.
+- Other teams change this data while you run. Proposals carry a snapshot; apply_reschedule re-reads before writing.
+- For "why is it late": run diagnose_work_order. Separate BLOCKING causes (no known ready date) from contributing ones. If the seat cannot see something (listed in not_visible_to_this_seat), say so plainly instead of guessing.
+- For "what does it block": run downstream_impact. Report blocked work orders and sales orders (customer, delivery date, value). Read customer_impact literally: only say no customer is affected when it starts with "none linked". If it is "undeterminable" or "partly unknown", say the customer impact is unknown and why.
+- For "reschedule": run propose_reschedule. Only proposals with writable_by_seat=true can be written, and only if apply_reschedule is available. Everything else is a recommendation that needs a person (explain why_not_writable).
+- Do not accept a false premise. If the user says an order is late but diagnose_work_order shows is_late=false, say it is not past due (record is_late=false) and still report what is holding it.
+- Costs: expected_cost and actual_cost are on the work order (diagnose_work_order). Variance = actual - expected, in the company currency. If both are 0 or missing, no cost has been recorded: say so and do not compute a variance (cost=null, outcome partial or refused).
+- Platform names: job cards = JobCard, downtime log = DowntimeEntry, sales/customer orders = SalesOrder, payroll = SalarySlip (another app). For anything else call seat_entities. Before refusing for lack of access, confirm with seat_capability on the REAL entity, and put that exact entity name in not_visible. If seat_capability returns a warning, you used a wrong name: retry with a real one.
+- Refuse when the data cannot support an answer or the seat is not permitted: the work order does not exist, the entity is not visible, or the requested change is outside this seat (for example changing a sales order delivery date, cancelling a work order, or reading payroll). Refusing correctly is a success, not a failure.
+- Before your final answer you MUST call record_finding exactly once with the structured result, including outcome "refused" when you refuse.
+Final answer: short, plain language, sections Why late / What it blocks / Rescheduling / Not visible to me."""
+
+RECORD_FINDING_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "outcome": {"type": "string", "enum": ["answered", "partial", "refused"],
+                    "description": "answered = every figure the user asked for was given from data. "
+                                   "partial = some asked-for figure could not be given (not recorded, or not visible to this seat). "
+                                   "refused = none of the request could be answered or done."},
+        "work_order": {"type": ["string", "null"], "description": "WO number the request was about, if any"},
+        "is_late": {"type": ["boolean", "null"], "description": "is_late from diagnose_work_order; null if not diagnosed"},
+        "currency": {"type": ["string", "null"], "description": "currency from company_context"},
+        "cost": {"type": ["object", "null"], "description": "only when cost data exists",
+                 "properties": {"expected": {"type": "number"}, "actual": {"type": "number"}, "variance": {"type": "number"}}},
+        "blocking_causes": {"type": "array", "items": {"type": "string"}, "description": "signal codes that block the order"},
+        "contributing_causes": {"type": "array", "items": {"type": "string"}},
+        "evidence_records": {"type": "array", "items": {"type": "string"}, "description": "record numbers cited"},
+        "blocked_work_orders": {"type": "array", "items": {"type": "string"}},
+        "blocked_sales_orders": {"type": "array", "items": {"type": "string"}},
+        "rescheduled": {"type": "array", "items": {"type": "object", "properties": {
+            "number": {"type": "string"}, "new_start": {"type": ["string", "null"]},
+            "new_end": {"type": ["string", "null"]}, "outcome": {"type": "string"}}, "required": ["number", "outcome"]}},
+        "customer_impact": {"type": "string", "description": "customer_impact value from downstream_impact, verbatim"},
+        "not_visible": {"type": "array", "items": {"type": "string"}},
+        "refusal_reason": {"type": ["string", "null"]},
+    },
+    "required": ["outcome", "work_order", "is_late", "currency", "blocking_causes", "evidence_records", "blocked_work_orders",
+                 "blocked_sales_orders", "rescheduled", "not_visible", "refusal_reason"],
+}
+
+
+def _fn(name, description, properties=None, required=None):
+    return {"type": "function", "function": {"name": name, "description": description, "parameters": {
+        "type": "object", "properties": properties or {}, "required": required or []}}}
+
+
+WO_REF = {"work_order": {"type": "string", "description": "Work order number (WO-YYYY-NNNNN) or id"}}
+
+
+class ProductionAgent:
+    def __init__(self, mcp: McpClient, *, model: str | None = None, run_id: str | None = None,
+                 apply_mode: bool = False, approve: Callable[[dict], bool] | None = None,
+                 allowed_write_ids: set[str] | None = None, trace: Callable[[dict], None] | None = None,
+                 max_steps: int = 20, llm=None):
+        self.mcp = mcp
+        self.model = model or config.env("OPENAI_MODEL", "gpt-4.1")
+        self.run_id = run_id or uuid.uuid4().hex[:12]
+        self.apply_mode = apply_mode
+        self.approve = approve or (lambda proposal: False)
+        self.allowed_write_ids = allowed_write_ids
+        self.trace = trace or (lambda event: None)
+        self.max_steps = max_steps
+        self._proposals: dict[str, dict] = {}
+        self.finding: dict | None = None
+        self.finding_record: dict | None = None
+        if llm is None:
+            from openai import OpenAI
+            llm = OpenAI(api_key=config.env("OPENAI_API_KEY"))
+        self.llm = llm
+
+    # ------------------------------------------------------------------ tools
+    def tool_specs(self) -> list[dict]:
+        specs = [
+            _fn("company_context", "Company name, country and currency for this book."),
+            _fn("list_late_work_orders", "Open work orders past their planned end date or projected late."),
+            _fn("diagnose_work_order", "Evidence for why a work order is late: subcontracts, material requests, stock, quality, workstations, schedule.", WO_REF, ["work_order"]),
+            _fn("downstream_impact", "Open work orders that consume this order's output (via BOMs) and the sales orders affected.", WO_REF, ["work_order"]),
+            _fn("propose_reschedule", "Proposed new dates for the order and its dependants, with whether this seat may write each.", WO_REF, ["work_order"]),
+            _fn("seat_entities", "Exact entity names in this seat's tool catalogue. Use these names; never invent one."),
+            _fn("seat_capability", "Check whether this seat can use a platform tool, e.g. 'SalesOrder.update', 'DowntimeEntry.list', 'SalarySlip.list'.",
+                {"tool": {"type": "string"}}, ["tool"]),
+            _fn("record_finding", "Persist the structured result. Call exactly once, before the final answer.",
+                RECORD_FINDING_SCHEMA["properties"], RECORD_FINDING_SCHEMA["required"]),
+        ]
+        if self.apply_mode:
+            specs.append(_fn("apply_reschedule", "Write one proposal returned by propose_reschedule (needs human approval).",
+                             {"work_order_id": {"type": "string"}}, ["work_order_id"]))
+        return specs
+
+    def _dispatch(self, name: str, args: dict):
+        ref = args.get("work_order")
+        if name == "company_context":
+            return domain.company_context(self.mcp)
+        if name == "list_late_work_orders":
+            rows = domain.list_late_work_orders(self.mcp)
+            return {"count": len(rows), "work_orders": rows[:40], "truncated": len(rows) > 40}
+        if name == "diagnose_work_order":
+            return domain.diagnose(self.mcp, ref)
+        if name == "downstream_impact":
+            return domain.downstream_impact(self.mcp, ref)
+        if name == "propose_reschedule":
+            result = domain.propose_reschedule(self.mcp, ref)
+            for p in result.get("proposals", []):
+                self._proposals[p["work_order_id"]] = p
+            return result
+        if name == "seat_entities":
+            return {"entities": domain.seat_entities(self.mcp)}
+        if name == "seat_capability":
+            return domain.seat_capability(self.mcp, args["tool"])
+        if name == "apply_reschedule" and self.apply_mode:
+            p = self._proposals.get(args["work_order_id"])
+            if not p:
+                return {"outcome": "refused", "detail": "no proposal for that id in this run; call propose_reschedule first"}
+            approved = self.approve(p)
+            self.trace({"type": "approval", "work_order": p["number"], "approved": approved})
+            if not approved:
+                return {"outcome": "not_approved", "number": p["number"]}
+            return domain.apply_proposal(self.mcp, p, self.allowed_write_ids)
+        if name == "record_finding":
+            if self.finding is not None:
+                return {"error": "finding already recorded for this run"}
+            self.finding = args
+            self.finding_record = domain.record_finding(self.mcp, self.run_id, args)
+            return self.finding_record
+        return {"error": f"unknown tool {name}"}
+
+    # ------------------------------------------------------------------ loop
+    def run(self, request: str) -> dict:
+        started = time.time()
+        messages = [{"role": "system", "content": SYSTEM_PROMPT}, {"role": "user", "content": request}]
+        self.trace({"type": "start", "run_id": self.run_id, "instance": self.mcp.session.instance,
+                    "model": self.model, "apply_mode": self.apply_mode, "request": request})
+        final, stop_reason = None, "max_steps"
+        for step in range(self.max_steps):
+            # Reasoning models (gpt-5.x, o-series) reject a non-default temperature.
+            sampling = {"temperature": 0} if self.model.startswith(("gpt-4", "gpt-3")) else {}
+            resp = self.llm.chat.completions.create(model=self.model, messages=messages,
+                                                    tools=self.tool_specs(), **sampling)
+            msg = resp.choices[0].message
+            usage = getattr(resp, "usage", None)
+            self.trace({"type": "llm", "step": step, "content": msg.content,
+                        "tool_calls": [{"id": c.id, "name": c.function.name, "arguments": c.function.arguments}
+                                       for c in (msg.tool_calls or [])],
+                        "usage": usage.model_dump() if usage else None})
+            messages.append(msg.model_dump(exclude_none=True))
+            if not msg.tool_calls:
+                final, stop_reason = msg.content, "final_answer"
+                break
+            for call in msg.tool_calls:
+                t0 = time.time()
+                try:
+                    args = json.loads(call.function.arguments or "{}")
+                    result = self._dispatch(call.function.name, args)
+                    error = None
+                except McpError as e:
+                    result, error = {"error": e.message, "kind": e.kind}, e.kind
+                except Exception as e:  # tool bugs must not kill the run; they are traced
+                    result, error = {"error": str(e)}, "exception"
+                    self.trace({"type": "exception", "tool": call.function.name, "traceback": traceback.format_exc()})
+                self.trace({"type": "tool", "step": step, "name": call.function.name,
+                            "arguments": call.function.arguments, "error": error,
+                            "seconds": round(time.time() - t0, 2), "result": result})
+                messages.append({"role": "tool", "tool_call_id": call.id,
+                                 "content": json.dumps(result, default=str)[:60000]})
+        outcome = {"run_id": self.run_id, "stop_reason": stop_reason, "final_answer": final,
+                   "finding": self.finding, "finding_record": self.finding_record,
+                   "seconds": round(time.time() - started, 1)}
+        self.trace({"type": "end", **outcome})
+        return outcome

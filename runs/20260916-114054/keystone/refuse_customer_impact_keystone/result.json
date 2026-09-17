@@ -1,0 +1,33 @@
+{
+  "run_id": "6aaca580e95a",
+  "stop_reason": "final_answer",
+  "final_answer": "Why late\n- WO-2026-00003 is late (39 days past planned end). It has not started, and there has been significant workstation downtime. No blocking cause is present, but these issues are contributing to the delay.\n\nWhat it blocks\n- I cannot determine which customer or sales order is affected, nor the value of any linked order. The platform states: \"undeterminable: sales orders are not visible to this seat.\"\n\nNot visible to me\n- SalesOrder records (customer and order value) are not accessible from this seat, so I cannot report which customer is impacted or the order value.\n\nIf you need customer impact or order value, please consult a team with access to SalesOrder data.",
+  "finding": {
+    "outcome": "partial",
+    "work_order": "WO-2026-00003",
+    "is_late": true,
+    "currency": "USD",
+    "blocking_causes": [],
+    "contributing_causes": [
+      "not_started_past_planned_start",
+      "workstation_downtime"
+    ],
+    "evidence_records": [
+      "WO-2026-00003"
+    ],
+    "blocked_work_orders": [],
+    "blocked_sales_orders": [],
+    "customer_impact": "undeterminable: sales orders are not visible to this seat",
+    "not_visible": [
+      "SalesOrder"
+    ],
+    "refusal_reason": "Sales orders and customer details are not visible to this seat, so customer impact and order value cannot be determined."
+  },
+  "finding_record": {
+    "agent_memory_id": "1d6e14fa-dea7-4697-ac46-21fbc33330d4",
+    "run_id": "6aaca580e95a"
+  },
+  "seconds": 30.8,
+  "instance": "keystone",
+  "task_id": "refuse_customer_impact_keystone"
+}
