@@ -54,12 +54,12 @@ Output goes to `runs/<timestamp>/<instance>/<task>/`: `task.json`, `fixture.json
 - **The finding goes into the database.** `record_finding` stores the structured conclusion in AgentMemory (private to our team), so verifiers read state, not prose.
 - **Nothing is hardcoded to one country.** Country and currency come from `Company`, and missing tools (e.g. SalesOrder on Keystone) are detected, not assumed.
 
-## Seat limits the agent reports rather than works around (2026-09-16)
+## Seat limits the agent reports rather than works around (2026-09-17)
 
-- JobCard and DowntimeEntry: permission denied on both instances, despite the schema granting read.
-- SalesOrder: read-only on Suryodaya, absent on Keystone.
-- No PurchaseOrder or StockEntry tools. WorkOrder has no parent/child link, so downstream impact comes from a reverse walk of BOM materials.
-- WorkOrder cancel requires admin.
+- **Readable since 17 Sep (after our bug reports):** JobCard, DowntimeEntry and EngineeringChangeOrder on both instances. The agent probes access on every run instead of assuming it.
+- **SalesOrder:** read-only on both instances (Keystone gained `sales_viewer` on 17 Sep).
+- **Outside the seat:** PurchaseOrder, StockEntry, Employee and payroll (REST 403, not in the catalogue).
+- **Links and locks:** WorkOrder has no parent/child link, so downstream impact comes from a reverse walk of BOM materials. Submitted work orders are date-locked, and cancel is admin-only (no longer listed for this seat).
 
 ## Rows this team created on Suryodaya
 

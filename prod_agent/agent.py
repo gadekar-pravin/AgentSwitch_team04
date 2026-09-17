@@ -16,14 +16,15 @@ How you work:
 - Cite record numbers (WO-..., SCO-..., MR-..., SO-...) for every claim.
 - Call company_context first. Use its currency and country; never assume a country, tax regime or currency.
 - Other teams change this data while you run. Proposals carry a snapshot; apply_reschedule re-reads before writing.
-- For "why is it late": run diagnose_work_order. Separate BLOCKING causes (no known ready date) from contributing ones. If the seat cannot see something (listed in not_visible_to_this_seat), say so plainly instead of guessing.
+- For "why is it late": run diagnose_work_order. Separate BLOCKING causes (no known ready date) from contributing ones. Use current_operation to say where the order is stuck (job card number, operation, workstation), and cite recorded downtime (reason, minutes) and pending engineering changes when present.
+- For machine downtime questions ("which machine had the most breakdown downtime"): run downtime_summary with the window and reason asked. Put the top workstation's number and name, plus any job cards or engineering changes you rely on, in evidence_records. If the seat cannot see something (listed in not_visible_to_this_seat), say so plainly instead of guessing.
 - For "what does it block": run downstream_impact. Work orders there are POTENTIAL consumers found by BOM matching (confidence "potential"): call them "may be affected", never "blocked", because stock or another order may cover the demand. A sales order linked on the late order itself (confidence "linked") is recorded exposure; one reached through a potential consumer is potential exposure. Report customer, delivery date and value. Read customer_impact literally: only say no customer is affected when it starts with "none linked". If it is "undeterminable" or "partly unknown", say the customer impact is unknown and why.
 - For "reschedule": run propose_reschedule. Only proposals with writable_by_seat=true can be written, and only if apply_reschedule is available. Everything else is a recommendation that needs a person (explain why_not_writable).
 - If apply_reschedule returns changed_underneath, someone else edited that order during this run. Do not retry or re-propose: every further write in this run is refused. Report the conflict, and escalate if escalate is available.
 - Escalation: when something needs a person (a locked order, a blocker with no known date, data this seat cannot see, a conflicting edit) and the escalate tool is available, call escalate ONCE for the request with: the work order, records checked, what is missing, and the action requested. Record the result in escalations. If it returns raised=false (for example no assignee), say plainly that no one could be assigned and who should be contacted; never claim an escalation that was not raised.
 - Do not accept a false premise. If the user says an order is late but diagnose_work_order shows is_late=false, say it is not past due (record is_late=false) and still report what is holding it.
 - Costs: expected_cost and actual_cost are on the work order (diagnose_work_order). Variance = actual - expected, in the company currency. If both are 0 or missing, no cost has been recorded: say so and do not compute a variance (cost=null, outcome partial or refused).
-- Platform names: job cards = JobCard, downtime log = DowntimeEntry, sales/customer orders = SalesOrder, payroll = SalarySlip (another app). For anything else call seat_entities. Before refusing for lack of access, confirm with seat_capability on the REAL entity, and put that exact entity name in not_visible. If seat_capability returns a warning, you used a wrong name: retry with a real one.
+- Platform names: job cards = JobCard, downtime log = DowntimeEntry, engineering changes = EngineeringChangeOrder, sales/customer orders = SalesOrder, purchase orders and receipt dates = PurchaseOrder, stock movements = StockEntry, operators/people and their contact details = Employee, payroll = SalarySlip (another app). For anything else call seat_entities. Before refusing for lack of access, confirm with seat_capability on the REAL entity, and put that exact entity name in not_visible. If seat_capability returns a warning, you used a wrong name: retry with a real one.
 - Refuse when the data cannot support an answer or the seat is not permitted: the work order does not exist, the entity is not visible, or the requested change is outside this seat (for example changing a sales order delivery date, cancelling a work order, or reading payroll). Refusing correctly is a success, not a failure.
 - Before your final answer you MUST call record_finding exactly once with the structured result, including outcome "refused" when you refuse.
 Final answer: short, plain language, sections Why late / What it blocks / Rescheduling / Not visible to me."""
@@ -95,7 +96,8 @@ class ProductionAgent:
         self.finding_record: dict | None = None
         if llm is None:
             from openai import OpenAI
-            llm = OpenAI(api_key=config.env("OPENAI_API_KEY"))
+            # The SDK backs off on 429/5xx; the default 2 retries is too few for a 30k tokens-per-minute key.
+            llm = OpenAI(api_key=config.env("OPENAI_API_KEY"), max_retries=8)
         self.llm = llm
 
     # ------------------------------------------------------------------ tools
@@ -106,6 +108,11 @@ class ProductionAgent:
             _fn("diagnose_work_order", "Evidence for why a work order is late: subcontracts, material requests, stock, quality, workstations, schedule.", WO_REF, ["work_order"]),
             _fn("downstream_impact", "Open work orders that consume this order's output (via BOMs) and the sales orders affected.", WO_REF, ["work_order"]),
             _fn("propose_reschedule", "Proposed new dates for the order and its dependants, with whether this seat may write each.", WO_REF, ["work_order"]),
+            _fn("downtime_summary", "Recorded downtime per workstation over the last N days, from downtime entries, optionally for one reason.",
+                {"days": {"type": "integer", "minimum": 1, "maximum": 366},
+                 "reason": {"type": ["string", "null"], "enum": ["breakdown", "planned_maintenance", "setup_change", "material_shortage",
+                                                               "power_failure", "quality_issue", "tool_change", "operator_unavailable",
+                                                               "other", None]}}, ["days"]),
             _fn("seat_entities", "Exact entity names in this seat's tool catalogue. Use these names; never invent one."),
             _fn("seat_capability", "Check whether this seat can use a platform tool, e.g. 'SalesOrder.update', 'DowntimeEntry.list', 'SalarySlip.list'.",
                 {"tool": {"type": "string"}}, ["tool"]),
@@ -141,6 +148,8 @@ class ProductionAgent:
                 if not p.get("writable_by_seat") and p["number"] == (result.get("work_order") or {}).get("number"):
                     self.needs_person.append(f"{p['number']}: {p.get('why_not_writable')}")
             return result
+        if name == "downtime_summary":
+            return domain.downtime_summary(self.mcp, args.get("days", 30), args.get("reason"))
         if name == "seat_entities":
             return {"entities": domain.seat_entities(self.mcp)}
         if name == "seat_capability":
@@ -174,6 +183,10 @@ class ProductionAgent:
         if name == "record_finding":
             if self.finding is not None:
                 return {"error": "finding already recorded for this run"}
+            cost = args.get("cost") or {}
+            if cost and not (cost.get("expected") or cost.get("actual")):
+                return {"error": "cost must be null when no cost is recorded (expected and actual are 0 or missing)",
+                        "instruction": "record cost=null, say no cost has been recorded, and use outcome partial or refused"}
             if self.escalate_mode and self.needs_person and not self.escalations:
                 # Guardrail, like record_finding itself: a handover a person must act on is not optional.
                 return {"error": "escalation required before recording the finding",

@@ -144,9 +144,9 @@ def test_sales_orders_read_only(suryodaya):
     assert not suryodaya.has_tool("SalesOrder.update")
 
 
-def test_bug_b3_admin_cancel_tool_listed(suryodaya):
-    # Fails once the platform fixes bug B3 (admin-only transitions listed for manufacturing_user).
-    assert suryodaya.has_tool("WorkOrder.cancel.not_started.cancelled")
+def test_bug_b3_fixed_admin_cancel_tool_not_listed(suryodaya):
+    # Bug B3 fixed 2026-09-17: admin-only transitions are no longer listed for manufacturing_user.
+    assert not suryodaya.has_tool("WorkOrder.cancel.not_started.cancelled")
 
 
 def test_payroll_entity_not_in_seat(suryodaya):
@@ -171,9 +171,15 @@ def test_completed_order_not_late(suryodaya):
     assert domain.diagnose(suryodaya, "WO-2026-00028")["is_late"] is False
 
 
-def test_rest_job_cards_denied_suryodaya():
+def test_bug_b1_fixed_rest_job_cards_readable_suryodaya():
+    # Bug B1 fixed 2026-09-17: the REST door now agrees with MCP.
+    assert RestClient(Session("suryodaya")).raw("/api/JobCard", limit=1)["data"]
+
+
+def test_purchase_orders_still_outside_seat(suryodaya):
+    assert not suryodaya.has_tool("PurchaseOrder.list")
     with pytest.raises(McpError) as exc:
-        RestClient(Session("suryodaya")).raw("/api/JobCard", limit=1)
+        RestClient(Session("suryodaya")).raw("/api/PurchaseOrder", limit=1)
     assert exc.value.code == 403
 
 
@@ -189,22 +195,34 @@ def test_keystone_country(keystone):
     assert domain.company_context(keystone)["country"] == "United States"
 
 
-def test_keystone_sales_order_not_in_catalogue(keystone):
-    assert domain.seat_capability(keystone, "SalesOrder.get")["in_catalogue"] is False
+def test_keystone_sales_orders_readable_not_writable(keystone):
+    # Keystone gained sales_viewer on 2026-09-17.
+    assert domain.seat_capability(keystone, "SalesOrder.get")["in_catalogue"] is True
+    assert not keystone.has_tool("SalesOrder.update")
 
 
-def test_keystone_wo28_has_no_recorded_cost(keystone):
-    wo = domain.diagnose(keystone, "WO-2026-00028")["work_order"]
-    assert wo["expected_cost"] == 0.0
-    assert wo["actual_cost"] == 0.0
+def test_keystone_wo77_has_no_recorded_cost(keystone):
+    # Keystone was reseeded on 2026-09-17; WO-2026-00077 carries no cost.
+    wo = domain.diagnose(keystone, "WO-2026-00077")["work_order"]
+    assert not wo["expected_cost"]
+    assert not wo["actual_cost"]
 
 
-def test_rest_job_cards_denied_keystone():
-    with pytest.raises(McpError) as exc:
-        RestClient(Session("keystone")).raw("/api/JobCard", limit=1)
-    assert exc.value.code == 403
+def test_bug_b1_fixed_rest_job_cards_readable_keystone():
+    assert RestClient(Session("keystone")).raw("/api/JobCard", limit=1)["data"]
 
 
-def test_bug_b1_job_card_tool_listed_keystone(keystone):
-    # Listed in the catalogue yet refused when called (bug B1). Fails once the platform fixes it.
-    assert keystone.has_tool("JobCard.list")
+def test_bug_b1_fixed_job_card_tool_usable_keystone(keystone):
+    assert keystone.call("JobCard.list", {"limit": 1})["data"]
+
+
+def test_diagnose_reports_current_operation(keystone):
+    d = domain.diagnose(keystone, "WO-2026-00010")
+    assert d["current_operation"]["job_card"].startswith("JC-")
+    assert "operation_not_started" in _codes(d)
+
+
+def test_downtime_summary_ranks_breakdowns(keystone):
+    s = domain.downtime_summary(keystone, 90, "breakdown")
+    minutes = [w["minutes"] for w in s["workstations"]]
+    assert s["available"] and minutes == sorted(minutes, reverse=True) and minutes[0] > 0

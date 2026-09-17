@@ -19,7 +19,10 @@ UUID_RE = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]
 UNDATED_BLOCKERS = {
     "subcontract_not_sent", "subcontract_overdue", "material_shortage",
     "quality_rejected", "workstation_unavailable",
+    "engineering_change_pending", "workstation_breakdown_active",
 }
+PENDING_ECO = {"draft", "submitted", "under_review"}
+DOWNTIME_LOOKBACK_DAYS = 90
 
 
 def _date(value) -> dt.date | None:
@@ -118,6 +121,37 @@ def company_context(mcp: McpClient) -> dict:
             "currency": c.get("default_currency"), "instance": mcp.session.instance}
 
 
+def downtime_summary(mcp: McpClient, days: int = 30, reason: str | None = None) -> dict:
+    """Recorded downtime per workstation over a window, from DowntimeEntry records (not schedule totals)."""
+    denied = _probe_denied(mcp, "DowntimeEntry.list")
+    if denied:
+        return {"available": False, "not_visible_to_this_seat": [f"DowntimeEntry: {denied}"]}
+    today = config.today()
+    since = today - dt.timedelta(days=max(int(days), 1))
+    stations = {w["id"]: w for w in mcp.list_all("Workstation")}
+    per_ws: dict[str, dict] = {}
+    counted = 0
+    for d in mcp.list_all("DowntimeEntry"):
+        began = _date(d.get("from_time"))
+        if not began or began < since or (reason and d.get("reason") != reason):
+            continue
+        counted += 1
+        ws = stations.get(d.get("workstation_id"), {})
+        row = per_ws.setdefault(d.get("workstation_id"), {
+            "workstation": ws.get("number"), "name": ws.get("name") or d.get("_workstation_id_display"),
+            "minutes": 0.0, "entries": 0, "reasons": {}, "examples": []})
+        mins = d.get("downtime_mins") or 0
+        row["minutes"] = round(row["minutes"] + mins, 2)
+        row["entries"] += 1
+        row["reasons"][d.get("reason")] = round(row["reasons"].get(d.get("reason"), 0) + mins, 2)
+        if len(row["examples"]) < 3:
+            row["examples"].append({"from": _iso(began), "to": _iso(_date(d.get("to_time"))), "minutes": mins,
+                                    "reason": d.get("reason"), "remarks": (d.get("remarks") or "")[:120] or None})
+    ranked = sorted(per_ws.values(), key=lambda r: -r["minutes"])
+    return {"available": True, "since": _iso(since), "today": _iso(today), "reason_filter": reason,
+            "entries_counted": counted, "workstations": ranked}
+
+
 def list_late_work_orders(mcp: McpClient) -> list[dict]:
     today = config.today()
     sched = {o["work_order_id"]: o for o in finite_schedule(mcp).get("orders", [])}
@@ -200,22 +234,90 @@ def diagnose(mcp: McpClient, ref: str) -> dict:
         elif qi.get("status") == "draft" and wo.get("quality_inspection_required"):
             sig("quality_inspection_pending", qi.get("number") or qi["id"])
 
+    # Shop-floor records. Access has changed on this platform before, so each is probed, never assumed.
+    not_visible: list[str] = []
+
+    def readable(entity: str) -> bool:
+        reason = _probe_denied(mcp, f"{entity}.list")
+        if reason:
+            not_visible.append(f"{entity}: {reason}")
+        return not reason
+
+    cards_readable, downtime_readable, eco_readable = readable("JobCard"), readable("DowntimeEntry"), readable("EngineeringChangeOrder")
+
     sched = finite_schedule(mcp)
     entry = next((o for o in sched.get("orders", []) if o["work_order_id"] == wid), None)
     load = {w["workstation_id"]: w for w in sched.get("workstation_load", [])}
+    route_ws = set()
     if entry:
         for cause in entry.get("causes", []):
             if cause.get("code") != "work_content_exceeds_due_date":
                 sig(f"schedule_{cause['code']}", cause.get("workstation_label"), minutes=cause.get("minutes"))
         for ws_id in {op["workstation_id"] for op in entry.get("operations", []) if op.get("workstation_id")}:
+            route_ws.add(ws_id)
             ws = load.get(ws_id, {})
             if ws.get("state") == "unavailable":
                 sig("workstation_unavailable", ws.get("record_label"), status=ws.get("status_code"))
-            if (ws.get("downtime_minutes") or 0) > 0:
+            if not downtime_readable and (ws.get("downtime_minutes") or 0) > 0:
+                # Fallback only: an unexplained total, used when downtime records cannot be read.
                 sig("workstation_downtime", ws.get("record_label"), downtime_minutes=round(ws["downtime_minutes"], 1))
 
-    not_visible = [f"{t.split('.')[0]}: {r}" for t in ("JobCard.list", "DowntimeEntry.list")
-                   if (r := _probe_denied(mcp, t))]
+    operations, current_operation, card_ids = [], None, set()
+    if cards_readable:
+        cards = sorted((j for j in mcp.list_all("JobCard", work_order_id=wid) if j.get("work_order_id") == wid),
+                       key=lambda j: (j.get("sequence") or 0, j.get("number") or ""))
+        for j in cards:
+            card_ids.add(j["id"])
+            if j.get("workstation_id"):
+                route_ws.add(j["workstation_id"])
+            operations.append({
+                "job_card": j.get("number"), "operation": j.get("operation_name"), "sequence": j.get("sequence"),
+                "status": j.get("status"), "workstation": j.get("_workstation_id_display") or j.get("workstation_id"),
+                "planned_start": (j.get("planned_start") or "")[:10] or None,
+                "planned_end": (j.get("planned_end") or "")[:10] or None,
+                "started_at": j.get("started_at"), "for_qty": j.get("for_qty"), "completed_qty": j.get("completed_qty"),
+            })
+        pending = [o for o in operations if o["status"] not in ("completed", "cancelled")]
+        if pending:
+            current_operation = pending[0]
+            start, end = _date(current_operation["planned_start"]), _date(current_operation["planned_end"])
+            if current_operation["status"] == "open" and start and start < today:
+                sig("operation_not_started", current_operation["job_card"], operation=current_operation["operation"],
+                    workstation=current_operation["workstation"], planned_start=_iso(start), days_waiting=(today - start).days)
+            elif current_operation["status"] == "in_progress" and end and end < today:
+                sig("operation_overrunning", current_operation["job_card"], operation=current_operation["operation"],
+                    workstation=current_operation["workstation"], planned_end=_iso(end), days_over=(today - end).days)
+
+    if downtime_readable:
+        since = today - dt.timedelta(days=DOWNTIME_LOOKBACK_DAYS)
+        route_totals: dict[str, dict] = {}
+        for d in mcp.list_all("DowntimeEntry"):
+            on_order = d.get("work_order_id") == wid or d.get("job_card_id") in card_ids
+            began, ended = _date(d.get("from_time")), _date(d.get("to_time"))
+            recent_on_route = d.get("workstation_id") in route_ws and began and began >= since
+            if not (on_order or recent_on_route):
+                continue
+            station = d.get("_workstation_id_display") or d.get("workstation_id")
+            if d.get("reason") == "breakdown" and (ended is None or ended >= today):
+                sig("workstation_breakdown_active", station, minutes=d.get("downtime_mins"), from_time=_iso(began),
+                    remarks=(d.get("remarks") or "")[:120] or None)
+            elif on_order:
+                sig("downtime_on_order", station, reason=d.get("reason"), minutes=d.get("downtime_mins"),
+                    from_time=_iso(began), to_time=_iso(ended), remarks=(d.get("remarks") or "")[:120] or None)
+            else:  # context, not a cause: summarised per workstation so it does not drown the real signals
+                t = route_totals.setdefault(station, {"minutes": 0.0, "entries": 0, "reasons": {}})
+                t["minutes"] = round(t["minutes"] + (d.get("downtime_mins") or 0), 2)
+                t["entries"] += 1
+                t["reasons"][d.get("reason")] = t["reasons"].get(d.get("reason"), 0) + 1
+        for station, t in sorted(route_totals.items(), key=lambda kv: -kv[1]["minutes"]):
+            sig("workstation_downtime_recorded", station, since=_iso(since), **t)
+
+    if eco_readable:
+        for e in mcp.list_all("EngineeringChangeOrder"):
+            hits = [a for a in (e.get("affected_work_orders") or []) if a.get("work_order_id") == wid]
+            if hits and e.get("status") in PENDING_ECO:
+                sig("engineering_change_pending", e.get("number"), status=e.get("status"), action=hits[0].get("action"),
+                    title=e.get("title"), priority=e.get("priority"))
 
     return {
         "found": True,
@@ -225,6 +327,8 @@ def diagnose(mcp: McpClient, ref: str) -> dict:
         "days_past_due": (today - due).days if due and status in OPEN_WO else None,
         "schedule": {k: (entry or {}).get(k) for k in ("verdict", "projected_finish", "days_late")},
         "route_workstations": sorted({op.get("workstation_label") for op in (entry or {}).get("operations", [])} - {None}),
+        "current_operation": current_operation,
+        "operations": operations,
         "signals": signals,
         "not_visible_to_this_seat": not_visible,
     }

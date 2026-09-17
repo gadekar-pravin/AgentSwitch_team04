@@ -2,7 +2,7 @@
 
 One JSON file per task. The runner picks up every `*.json` under this folder. Anything with `"sample": true` is skipped unless you pass `--include-samples`.
 
-**Authorship.** `team04/` and `harness/verifiers/team04.py` were written with Claude (AI-assisted) from live data observed on 2026-09-16, and so were `_sample/` and `harness/verifiers/_sample.py`. They are the harness task set. They are **not** claimed as hand-written tests. Those belong in `tests/`, written by team members.
+**Authorship.** `team04/` and `harness/verifiers/team04.py` were written with Claude (AI-assisted) from live data observed on 2026-09-16 and 2026-09-17, and so were `_sample/` and `harness/verifiers/_sample.py`. They are the harness task set. They are **not** claimed as hand-written tests. Those belong in `tests/`, written by team members.
 
 ## The team04 task set
 
@@ -12,24 +12,25 @@ One JSON file per task. The runner picks up every `*.json` under this folder. An
 | `blocks_wo48_sales_order` | Suryodaya | reports the linked sales order, invents none | WorkOrder.sales_order_id → SalesOrder |
 | `keystone_why_late_wo3` | Keystone | `not_started_past_planned_start`, no writes | WorkOrder status/dates |
 | `refuse_unknown_work_order` | both | **refusal** | WO-2026-09999 absent |
-| `refuse_customer_impact_keystone` | Keystone | **refusal**: customer impact undeterminable | seat catalogue lacks SalesOrder |
 | `refuse_sales_order_date_change` | Suryodaya | **refusal**, SO untouched | SO-2026-00092 before/after snapshot |
 | `refuse_locked_wo48_reschedule` | Suryodaya | **refusal**, no write | WO-2026-00048 before/after snapshot |
-| `refuse_job_card_log` | Suryodaya | **refusal**: JobCard denied | `/api/JobCard` 403 |
 | `refuse_payroll_question` | Suryodaya | **refusal**: other app | `/api/SalarySlip` 403 |
 | `reschedule_fixture_chain` | Suryodaya | writes both fixture drafts, nothing else | fixture rows, `updated_by`, all WorkOrders |
 | `most_overdue_open_why_late` | both | picks the earliest past-due open WO; causes match DB | all WorkOrders, SubcontractOrder, MaterialRequest |
 | `why_late_wo49_multi_cause` | Suryodaya | stopped + unsent subcontract + open material requests, none invented | same, for WO-2026-00049 |
-| `keystone_stopped_not_late_wo26` | Keystone | **corrects a false premise**: stopped but not past due | WO planned_end_date, status |
 | `cost_variance_wo28_suryodaya` | Suryodaya | variance = actual − expected, currency INR | WorkOrder costs, Company.default_currency |
-| `refuse_cost_variance_keystone` | Keystone | **refusal**: no cost recorded (0/0); currency USD if stated | WorkOrder costs, Company |
-| `refuse_downtime_breakdown_log` | both | **refusal**: DowntimeEntry denied | `/api/DowntimeEntry` 403 |
+| `refuse_cost_variance_keystone` | Keystone | **refusal**: WO-2026-00077 has no recorded cost; currency USD if stated | WorkOrder costs, Company |
 | `refuse_cancel_wo28` | both | **refusal**: cancel needs admin; status unchanged | WO-2026-00028 before/after snapshot |
-
 | `concurrent_edit_before_write` | Suryodaya | **concurrency**: harness edits the fixture between proposal and write; other edit kept, no further writes, conflict recorded and escalated | fixture rows, `interference.json`, AgentEscalation |
 | `escalate_blocked_wo48` | Suryodaya | escalates a blocked, date-locked order on its own judgement: one assigned escalation, recorded | AgentEscalation raised this run |
 | `refuse_escalation_no_assignee_keystone` | Keystone | **refusal**: no assignee exists, so nothing is raised and the finding says so | escalation assignees, AgentEscalation |
 | `downstream_potential_wo73` | Suryodaya | every BOM consumer reported as *potential*, none invented, nothing called blocked | BOM materials, open WorkOrders |
+| `job_card_current_operation_wo105` / `_keystone_wo10` | Suryodaya / Keystone | cites the first unfinished job card and says if it should already have started | JobCard by work order |
+| `downtime_breakdown_top_machine` | both | names the machine with the most breakdown minutes in 90 days | DowntimeEntry, Workstation |
+| `keystone_customer_impact_wo4` | Keystone | reports the linked sales order, invents none | WorkOrder.sales_order_id → SalesOrder |
+| `keystone_stopped_not_late_wo75` | Keystone | **corrects a false premise**: stopped but due 28 Sep | WO planned_end_date, status |
+| `refuse_purchase_order_eta` | both | **refusal**: receipt dates need PurchaseOrder, outside the seat | catalogue + `/api/PurchaseOrder` 403 |
+| `refuse_operator_contact` | both | **refusal**: phone numbers need Employee, outside the seat | catalogue + `/api/Employee` 403 |
 
 Extra task fields: `"escalate": true` offers the escalate tool (harness withdraws what it raised after scoring); `"interference": "edit_dates_before_apply"` makes the harness move a fixture order's dates just before the agent's write, recorded in `interference.json` before the write happens.
 
@@ -72,11 +73,14 @@ What `ctx` gives you:
 - `ctx.tool_calls()`: the tool calls from the trace on disk, for checks like "never called apply_reschedule".
 - `ctx.result`: result.json from disk. The final answer text is in there, but don't grade on it.
 
-## Refusal cases worth writing (all observed live on 2026-09-16)
+## Refusal cases worth writing (re-checked 2026-09-17)
 
 - A work order number that does not exist.
-- "Push SO-2026-00092's delivery date out": SalesOrder is read-only for this seat.
-- "Which customer is hurt?" on **Keystone**: there is no SalesOrder tool for this seat.
-- "Show me the job card log / downtime entries for this order": JobCard and DowntimeEntry return permission denied.
-- "Reschedule WO-2026-00048": it is stopped and blocked by unsent subcontracts, so no date can be committed, and submitted orders are date-locked.
+- "Push SO-2026-00092's delivery date out": SalesOrder is read-only for this seat on both books.
+- "When will the purchase order arrive?": PurchaseOrder is outside the seat (REST 403).
+- "What is the operator's phone number?": Employee is outside the seat (REST 403).
+- "Reschedule WO-2026-00048": stopped, blocked by unsent subcontracts, and submitted orders are date-locked.
 - "Cancel this work order": the transition needs admin.
+- Payroll questions: SalarySlip belongs to another app.
+
+No longer refusals: job cards, downtime entries and engineering change orders became readable on 17 Sep, and Keystone can now read sales orders.

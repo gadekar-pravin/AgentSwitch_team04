@@ -160,6 +160,7 @@ def test_blocking_subcontract(surya):
 
 
 # Test 11: Job card visibility
+# Job cards became readable for the Production seat on 2026-09-17 (bug f99d53d5 fixed).
 
 def test_job_card_visibility(surya):
     result = domain.diagnose(
@@ -169,10 +170,13 @@ def test_job_card_visibility(surya):
 
     not_visible = result["not_visible_to_this_seat"]
 
-    assert any(
+    assert not any(
         "JobCard" in str(item)
         for item in not_visible
     )
+
+    assert result["current_operation"] is not None
+    assert result["current_operation"]["job_card"].startswith("JC-")
 
 
 # Test 12: Downstream sales order
@@ -206,15 +210,18 @@ def test_reschedule_restrictions(surya):
 
 
 # Test 14: Job card permission
+# Readable since 2026-09-17; the tool is listed and returns rows.
 
 def test_job_card_permission(surya):
-    with pytest.raises(McpError) as exc:
-        surya.call(
-            "JobCard.list",
-            {"limit": 1},
-        )
+    assert surya.has_tool("JobCard.list")
 
-    assert exc.value.kind == "permission_denied"
+    result = surya.call(
+        "JobCard.list",
+        {"limit": 1},
+    )
+
+    assert len(result["data"]) == 1
+    assert result["data"][0]["number"].startswith("JC-")
 
 
 # Test 15: Unknown entity detection
@@ -250,34 +257,62 @@ def test_keystone_currency(keystone):
 
 
 # Test 18: Sales order permission
+# Keystone gained the sales_viewer role on 2026-09-17: read, but still no update.
 
 def test_keystone_sales_order_permission(keystone):
-    result = keystone.has_tool("SalesOrder.get")
-
-    assert result is False
+    assert keystone.has_tool("SalesOrder.get") is True
+    assert keystone.has_tool("SalesOrder.update") is False
 
 
 # Test 19: Customer impact uncertainty
+# No live order lacks a readable sales order any more, so a fake seat without
+# SalesOrder tools checks that the agent still refuses to invent customer impact.
 
-def test_customer_impact_uncertainty(keystone):
+class NoSalesOrderMCP:
+    def __init__(self):
+        self.order = {
+            "id": "wo-1",
+            "number": "WO-FAKE-1",
+            "item_id": "item-1",
+            "bom_id": "bom-1",
+            "status": "not_started",
+            "sales_order_id": "so-1",
+            "production_strategy": "make_to_order",
+        }
+
+    def list_all(self, entity, **filters):
+        return [self.order] if entity == "WorkOrder" else []
+
+    def call(self, name, args):
+        assert name == "WorkOrder.get", f"unexpected call {name}"
+        return dict(self.order)
+
+    def has_tool(self, name):
+        return not name.startswith("SalesOrder.")
+
+
+def test_customer_impact_uncertainty():
     result = domain.downstream_impact(
-        keystone,
-        "WO-2026-00003",
+        NoSalesOrderMCP(),
+        "WO-FAKE-1",
     )
 
     assert result["customer_impact"].startswith(
         "undeterminable"
     )
+    assert result["blocked_sales_orders"] == []
 
 
 # Test 20: Stopped but not late
+# Keystone was reseeded on 2026-09-17; WO-2026-00075 is stopped and due 2026-09-28.
 
 def test_stopped_order_not_late(keystone):
     result = domain.diagnose(
         keystone,
-        "WO-2026-00026",
+        "WO-2026-00075",
     )
 
+    assert result["work_order"]["status"] == "stopped"
     assert result["is_late"] is False
 
 
