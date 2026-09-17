@@ -6,23 +6,24 @@
 
 ## Why Carbon
 
-[Carbon](https://carbon.ms) is an AI-native, open-source manufacturing system: ERP, MES and quality on one data model. It ships an **MCP server**, so an agent can drive its production data the way ours must, which makes the bar public. We reviewed its scheduling and MCP documentation and public source (*documented*, not run in a trial). Tulip's Production Dispatcher agent was a secondary reference for dispatching.
+[Carbon](https://carbon.ms) is an AI-native, open-source manufacturing system (ERP, MES and quality on one data model) that ships an **MCP server** over its production data, so the bar for our agent is public. We reviewed its scheduling and MCP documentation and public source (*documented*, not run in a trial). Tulip's Production Dispatcher agent was a secondary reference.
 
 ## What we have
 
-Work orders with a six-state workflow, plus BOMs, routings, operations, workstations, changeover times, production plans, material requests, subcontract orders, quality inspections, batches and serial numbers. There is also a finite-schedule endpoint and a stock-availability check.
+Work orders with a six-state workflow; BOMs, routings, workstations, production plans, material requests, subcontract orders, quality inspections, batches and serials; a finite-schedule endpoint and a stock-availability check.
 
 ## 1. What Carbon does that we do not
 
-| Capability | Carbon (*documented*) | AgentSwitch today (*observed*) |
-|---|---|---|
-| **Capacity-aware scheduling** | Places operations within work-centre hours, subtracts maintenance downtime, reserves qualified operators | The schedule projects open orders to finish today. It models neither work calendars nor labour, and downtime does not reduce capacity |
-| **Specific delay reasons** | Operation-level reasons: waiting behind a named job, a work centre, or an operator | 50 of 51 late Suryodaya orders (17 Sep) get the same generic cause, which restates that the due date passed |
-| **What-if and replanning** | Non-persistent completion forecast; whole-location replan that reports newly late jobs | No simulation or capacity-based replan. Submitted orders are date-locked, and only an admin can cancel to re-plan |
-| **Shared-material allocation** | Shortfall calculated across active jobs in priority order | Stock is checked one order at a time; stock ledgers are outside the Production seat |
-| **Order dependencies** | Predecessors within a job; knock-on lateness after a replan | No link between work orders; sub-assembly BOMs are flagged but not connected |
+| Capability | Carbon (*documented*) | AgentSwitch today (*observed*) | Gap assessment |
+|---|---|---|---|
+| **Capacity-aware scheduling** | Places operations within work-centre hours, subtracts maintenance downtime, reserves qualified operators | The schedule projects open orders to finish today. It models neither work calendars nor labour, and downtime does not reduce capacity | **Platform defect and model gap** |
+| **Specific delay reasons** | Operation-level reasons: waiting behind a named job, a work centre, or an operator | 50 of 51 late Suryodaya orders (17 Sep) get the same generic cause, which restates that the due date passed | **Agent partly**; platform output gap plus filed access bugs |
+| **What-if analysis** | Non-persistent forecast of projected completion | No simulation tool in the seat's MCP catalogue | **Platform capability missing** |
+| **Replanning** | Whole-location replan that reports newly late jobs | No capacity-based replan. Submitted orders are date-locked, and only an admin can cancel to re-plan | **Platform capability missing** |
+| **Shared-material allocation** | Shortfall calculated across active jobs in priority order | Stock is checked one order at a time; stock ledgers are outside the Production seat | **Agent partly**; seat limit plus scoped-service gap |
+| **Order dependencies** | Predecessors within a job; knock-on lateness after a replan | No link between work orders; sub-assembly BOMs are flagged but not connected | **Agent partly**; platform link missing |
 
-**Access bugs, not missing features.** Job cards, downtime entries and engineering change orders exist and are granted to our role in the schema, but the seat is refused, so we filed them as bugs. On Keystone the seat has no sales-order tools, because it lacks the `viewer` role that Suryodaya's seat has.
+**Access bugs, not missing features.** Job cards, downtime entries and engineering change orders exist and the schema grants them to our role, but the seat is refused. We filed these as bugs.
 
 ## 2. Which gaps an agent can close with the tools we already have
 
@@ -34,11 +35,19 @@ Work orders with a six-state workflow, plus BOMs, routings, operations, workstat
 
 **Yours: platform work**
 
-Capacity-aware dates (calendars, labour, downtime) · what-if simulation and replanning · an amend transition for submitted orders · work-order pegging · a Production-scoped view of shared stock · fixing access to job cards, downtime and engineering changes · sales orders on Keystone.
+| Required capability | Why the agent cannot safely rebuild it | Classification |
+|---|---|---|
+| Capacity-aware projected dates | The schedule does not model calendars, labour or downtime | Platform defect and model gap |
+| What-if analysis and replanning | No tool previews a change without saving it; re-reading records cannot reproduce a scheduler | Platform capability missing |
+| Re-dating submitted orders | Dates lock after submit; only an admin can cancel | Platform capability missing |
+| Cross-order dependency (pegging) | A BOM match shows possible demand, not a confirmed supply link | Platform link missing |
+| Shared-material allocation | Stock ledgers are outside the Production seat | Seat limit plus scoped-service gap |
+| Job-card, downtime and engineering-change evidence | Access is refused, and prompting cannot bypass permissions | Filed access bugs |
+| Sales orders on Keystone | The seat lacks the `viewer` role there | Seat limit; escalate to a person |
 
 ## 3. What an agent can do that Carbon's product cannot
 
-Carbon exposes MCP too, so we do not claim a capability no Carbon-connected agent could have. The advantage is **orchestration with evidence discipline**: finishing the whole request in one pass that Carbon's product leaves to a person.
+Carbon exposes MCP too, so we claim no exclusive capability. The advantage is **orchestration with evidence discipline**: one pass through the whole request, which Carbon's product leaves to a person.
 
 - **Carbon splits capacity and material.** Its scheduler gates on capacity, while shortage lives in a separate service, so a shortage never appears as the late cause. An agent must join the two.
 - **A Carbon date change does not replan itself.** A separate replan call follows, covering every job at the location, so the result must be re-read, not assumed from the write.
@@ -50,6 +59,6 @@ Carbon exposes MCP too, so we do not claim a capability no Carbon-connected agen
 - **States the exposure:** sales order SO-2026-00092, Kirloskar Pumps, INR 494,476.64, promised for 7 March 2026.
 - **Decides what not to do:** it commits no date while the subcontract is unsent, says who must act, and names what the seat cannot see (job cards, downtime).
 
-All of this happens in a book other teams are changing: the agent re-reads before acting and never overwrites a row that moved. On Keystone it reads currency (USD) and available tools from the platform, and reports customer impact as unknown instead of inventing a customer.
+It works in a book other teams are changing, re-reading before acting and never overwriting a row that moved. On Keystone it reads currency (USD) and tools from the platform, and reports customer impact as unknown instead of inventing a customer.
 
 *Carbon source review: Pravin Gadekar. AgentSwitch observations: Team 04.*
