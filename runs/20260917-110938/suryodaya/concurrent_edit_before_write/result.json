@@ -1,0 +1,105 @@
+{
+  "run_id": "4e70efc7c3d5",
+  "stop_reason": "final_answer",
+  "final_answer": "WO-2026-00123: Late Work Order \u2013 Analysis, Downstream Impact, and Rescheduling\n\nWhy late\n- WO-2026-00123 is late (3 days past planned end, status: draft, not released). There are no BLOCKING causes, but the order is not released, which is a contributing cause (WO-2026-00123).\n\nWhat it blocks\n- Several downstream work orders may be affected, including WO-2026-00124, WO-2026-00110, WO-2026-00095, WO-2026-00080, WO-2026-00065, WO-2026-00112, WO-2026-00107, and others.\n- Potential customer impact: partly unknown, as this is a make-to-order item without a linked sales order (WO-2026-00123, WO-2026-00124).\n- Potentially affected sales orders (not confirmed blocked): \n    - SO-2026-00027, SO-2026-00192, SO-2026-00187, SO-2026-00056 (Tata Ficosa Automotive Systems)\n    - SO-2026-00053, SO-2026-00198, SO-2026-00164, SO-2026-00039 (Kirloskar Pumps Ltd)\n  (see records for delivery dates and values).\n\nRescheduling\n- Attempted to reschedule WO-2026-00123 and downstream orders. However, WO-2026-00123 was changed by another user during this process, so no changes could be applied. Further rescheduling is blocked until a person reviews and re-plans.\n- This issue has been escalated to Meera Kulkarni (ESC-2026-00012) for manual intervention.\n\nNot visible to me\n- No visibility restrictions affected this analysis.\n\nSummary: WO-2026-00123 is late due to not being released. Downstream work orders and several sales orders may be affected, but the exact customer impact is partly unknown. Rescheduling could not proceed because the order was changed during this run; the issue has been escalated for manual review.",
+  "finding": {
+    "outcome": "partial",
+    "work_order": "WO-2026-00123",
+    "is_late": true,
+    "currency": "INR",
+    "blocking_causes": [],
+    "contributing_causes": [
+      "not_released"
+    ],
+    "evidence_records": [
+      "WO-2026-00123",
+      "WO-2026-00124",
+      "WO-2026-00110",
+      "WO-2026-00095",
+      "WO-2026-00080",
+      "WO-2026-00065",
+      "WO-2026-00112",
+      "WO-2026-00107"
+    ],
+    "potentially_blocked_work_orders": [
+      "WO-2026-00124",
+      "WO-2026-00110",
+      "WO-2026-00095",
+      "WO-2026-00080",
+      "WO-2026-00065",
+      "WO-2026-00112",
+      "WO-2026-00107",
+      "WO-2026-00097",
+      "WO-2026-00092",
+      "WO-2026-00082",
+      "WO-2026-00077",
+      "WO-2026-00067",
+      "WO-2026-00062",
+      "WO-2026-00052"
+    ],
+    "blocked_sales_orders": [
+      "SO-2026-00027",
+      "SO-2026-00192",
+      "SO-2026-00187",
+      "SO-2026-00056",
+      "SO-2026-00053",
+      "SO-2026-00198",
+      "SO-2026-00164",
+      "SO-2026-00039"
+    ],
+    "rescheduled": [
+      {
+        "number": "WO-2026-00123",
+        "outcome": "changed_underneath"
+      },
+      {
+        "number": "WO-2026-00124",
+        "outcome": "refused"
+      },
+      {
+        "number": "WO-2026-00110",
+        "outcome": "refused"
+      },
+      {
+        "number": "WO-2026-00112",
+        "outcome": "refused"
+      },
+      {
+        "number": "WO-2026-00107",
+        "outcome": "refused"
+      }
+    ],
+    "customer_impact": "partly unknown: make-to-order without a linked sales order: WO-2026-00123, WO-2026-00124",
+    "not_visible": [],
+    "escalations": [
+      {
+        "raised": true,
+        "number": "ESC-2026-00012",
+        "assignee": "Meera Kulkarni",
+        "reason_code": "unresolved_after_retries"
+      }
+    ],
+    "refusal_reason": "WO-2026-00123 changed underneath during this run; rescheduling cannot proceed and has been escalated."
+  },
+  "finding_record": {
+    "agent_memory_id": "66537724-459d-43dc-a3b9-fb515a64ab10",
+    "run_id": "4e70efc7c3d5"
+  },
+  "escalations": [
+    {
+      "raised": true,
+      "escalation_id": "b5368ba1-0e5b-4b8d-8cc4-e45786598d8f",
+      "number": "ESC-2026-00012",
+      "status": "open",
+      "assignee": "Meera Kulkarni",
+      "due_at": "2026-09-17T20:12:19.940874+00:00"
+    }
+  ],
+  "agent_session_id": "7c86c18a-b510-4956-a94e-a66888819382",
+  "conflicts": [
+    "WO-2026-00123"
+  ],
+  "seconds": 100.8,
+  "instance": "suryodaya",
+  "task_id": "concurrent_edit_before_write"
+}

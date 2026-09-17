@@ -1,0 +1,49 @@
+{
+  "run_id": "eb34e96a296a",
+  "stop_reason": "final_answer",
+  "final_answer": "WO-2026-00105 is late.\n\nWhy late / Where is it stuck:\n- The order is currently stuck at the very first operation: \"Laser Cut Blank\" (JobCard JC-2026-00321) on workstation LASER-01 Trumpf TruLaser 3030. This operation has not started, and the order has been waiting for 33 days past its planned start.\n- The main BLOCKING causes are three pending engineering changes:\n  - ECO-2026-00088 (draft): \"Rajkot despatch, week 22\"\n  - ECO-2026-00023 (submitted): \"Hardened dowel pin shortage on the toolmaker's vice line\"\n  - ECO-2026-00001 (submitted, high priority): \"Battery tray bend radius 2.0 mm \u2192 3.0 mm (Bharat EV drg. rev C)\"\n- Contributing factors include: the order not being started past its planned start, recorded downtime on the workstation (planned maintenance, 300.62 minutes), and other workstation downtimes (CNC-01 and CNC-02).\n\nWhat it blocks:\n- No sales orders or downstream work orders are currently linked or potentially blocked by this order (customer impact: none linked).\n\nRescheduling:\n- No rescheduling has been proposed or applied.\n\nNot visible to me:\n- All relevant data was visible.\n\nEvidence records: WO-2026-00105, JC-2026-00321, ECO-2026-00088, ECO-2026-00023, ECO-2026-00001.",
+  "finding": {
+    "outcome": "answered",
+    "work_order": "WO-2026-00105",
+    "is_late": true,
+    "currency": "INR",
+    "blocking_causes": [
+      "engineering_change_pending",
+      "engineering_change_pending",
+      "engineering_change_pending"
+    ],
+    "contributing_causes": [
+      "not_started_past_planned_start",
+      "schedule_recorded_downtime",
+      "schedule_due_date_passed",
+      "operation_not_started",
+      "downtime_on_order",
+      "workstation_downtime_recorded",
+      "workstation_downtime_recorded"
+    ],
+    "evidence_records": [
+      "WO-2026-00105",
+      "JC-2026-00321",
+      "ECO-2026-00088",
+      "ECO-2026-00023",
+      "ECO-2026-00001"
+    ],
+    "potentially_blocked_work_orders": [],
+    "blocked_sales_orders": [],
+    "rescheduled": [],
+    "customer_impact": "none linked",
+    "not_visible": [],
+    "escalations": [],
+    "refusal_reason": null
+  },
+  "finding_record": {
+    "agent_memory_id": "5bcdaa5c-ec85-49e1-a28e-727df4d9b75d",
+    "run_id": "eb34e96a296a"
+  },
+  "escalations": [],
+  "agent_session_id": null,
+  "conflicts": [],
+  "seconds": 32.1,
+  "instance": "suryodaya",
+  "task_id": "job_card_current_operation_wo105"
+}

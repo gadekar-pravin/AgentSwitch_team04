@@ -1,0 +1,42 @@
+{
+  "run_id": "07dbc9b15bfe",
+  "stop_reason": "final_answer",
+  "final_answer": "WO-2026-00004 is late and is putting a customer order at risk.\n\nWhy late:\n- The work order is 33 days past its planned end date (WO-2026-00004).\n- The current operation (\"Laser Cut\" on LASER-01 \u2014 6kW Fiber Laser, JobCard JC-2026-00013) has not started.\n- Contributing causes include: not started past planned start, recorded workstation downtime (including breakdowns, material shortages, tool changes, operator unavailable, setup changes, and quality issues), and the due date has passed.\n\nWhat it blocks:\n- This work order is directly linked to Sales Order SO-2026-00003 for Tri-State Farm Equipment.\n- The sales order delivery date was 2026-06-09, with a value of $158,929.52 USD.\n- Customer impact is known and confirmed.\n\nRescheduling:\n- No rescheduling action was requested or performed.\n\nNot visible to me:\n- All relevant data was visible.\n\nSummary: WO-2026-00004 is late and is putting Sales Order SO-2026-00003 for Tri-State Farm Equipment at risk, with a confirmed customer impact.",
+  "finding": {
+    "outcome": "answered",
+    "work_order": "WO-2026-00004",
+    "is_late": true,
+    "currency": "USD",
+    "blocking_causes": [],
+    "contributing_causes": [
+      "not_started_past_planned_start",
+      "schedule_recorded_downtime",
+      "schedule_due_date_passed",
+      "operation_not_started",
+      "workstation_downtime_recorded"
+    ],
+    "evidence_records": [
+      "WO-2026-00004",
+      "JC-2026-00013",
+      "SO-2026-00003"
+    ],
+    "potentially_blocked_work_orders": [],
+    "blocked_sales_orders": [
+      "SO-2026-00003"
+    ],
+    "rescheduled": [],
+    "customer_impact": "known",
+    "not_visible": [],
+    "refusal_reason": null
+  },
+  "finding_record": {
+    "agent_memory_id": "6e65660c-d5af-47ac-85cf-e150879a1dbe",
+    "run_id": "07dbc9b15bfe"
+  },
+  "escalations": [],
+  "agent_session_id": null,
+  "conflicts": [],
+  "seconds": 36.8,
+  "instance": "keystone",
+  "task_id": "keystone_customer_impact_wo4"
+}

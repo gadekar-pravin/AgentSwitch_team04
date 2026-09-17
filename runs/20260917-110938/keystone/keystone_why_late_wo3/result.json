@@ -1,0 +1,52 @@
+{
+  "run_id": "08f387c5bc0b",
+  "stop_reason": "final_answer",
+  "final_answer": "Why late\n- WO-2026-00003 is late by 17 days (planned end: 2026-08-31, today: 2026-09-17).\n- The order has not started; the first operation (Laser Cut, JobCard JC-2026-00009) is still open and unstarted.\n- Contributing causes include: not started past planned start, recorded workstation downtime (notably on WS-2026-00003, WELD-03 \u2014 Robotic MIG Cell, COAT-06 \u2014 Powder Coat Line, LASER-01 \u2014 6kW Fiber Laser, BRAKE-02 \u2014 175-ton Press Brake), and the due date has passed.\n- No single blocking cause prevents a new start, but the order is stuck at the first operation.\n\nWhat it blocks\n- No downstream work orders or sales orders are currently linked or potentially blocked by this order (customer impact: none linked).\n\nRescheduling\n- A new schedule is proposed (start: 2026-09-17, end: 2026-10-26), but this seat cannot commit the change. Dates are locked after submit and require an admin cancel to adjust.\n\nNot visible to me\n- All relevant records were visible.\n\nIf you need the dates changed, please contact an admin with permission to cancel or unlock the work order.",
+  "finding": {
+    "outcome": "answered",
+    "work_order": "WO-2026-00003",
+    "is_late": true,
+    "currency": "USD",
+    "blocking_causes": [],
+    "contributing_causes": [
+      "not_started_past_planned_start",
+      "schedule_recorded_downtime",
+      "schedule_due_date_passed",
+      "operation_not_started",
+      "workstation_downtime_recorded"
+    ],
+    "evidence_records": [
+      "WO-2026-00003",
+      "JC-2026-00009",
+      "WS-2026-00003",
+      "WELD-03 \u2014 Robotic MIG Cell",
+      "COAT-06 \u2014 Powder Coat Line",
+      "LASER-01 \u2014 6kW Fiber Laser",
+      "BRAKE-02 \u2014 175-ton Press Brake"
+    ],
+    "potentially_blocked_work_orders": [],
+    "blocked_sales_orders": [],
+    "rescheduled": [
+      {
+        "number": "WO-2026-00003",
+        "new_start": "2026-09-17",
+        "new_end": "2026-10-26",
+        "outcome": "refused"
+      }
+    ],
+    "customer_impact": "none linked",
+    "not_visible": [],
+    "escalations": [],
+    "refusal_reason": "Rescheduling is not permitted for this work order: dates are locked after submit and require an admin cancel."
+  },
+  "finding_record": {
+    "agent_memory_id": "04125671-fb70-49e5-80cf-01058c23a915",
+    "run_id": "08f387c5bc0b"
+  },
+  "escalations": [],
+  "agent_session_id": null,
+  "conflicts": [],
+  "seconds": 56.1,
+  "instance": "keystone",
+  "task_id": "keystone_why_late_wo3"
+}

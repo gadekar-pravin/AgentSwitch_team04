@@ -1,0 +1,74 @@
+{
+  "run_id": "06572c6ef010",
+  "stop_reason": "final_answer",
+  "final_answer": "Why late\nWork order WO-2026-00048 is late (203 days past due). The main blocking causes are:\n- Two subcontracts not sent: SCO-2026-00076 (Supriya Rathi) and SCO-2026-00030 (Shreeji Powder Coating), both in draft with no expected delivery.\n- Two pending engineering changes: ECO-2026-00064 (\"Aluminium extrusion shortage on the v-block pair line\") and ECO-2026-00012 (\"Spring steel strip shortage on the punch set line\"), both unresolved.\nThe order is currently stuck at JobCard JC-2026-00142 (Fastener Assembly) on workstation ASSY-01 Assembly & Final Inspection, with no production started.\n\nWhat it blocks\nWO-2026-00048 is directly linked to Sales Order SO-2026-00092 for Kirloskar Pumps Ltd (delivery due 2026-03-07, value INR 494,476.64). This customer order is undelivered and confirmed, so the customer is affected.\n\nRescheduling\nRescheduling is not possible at this time. The system cannot commit to a new date because the order is blocked by unresolved subcontracts and engineering changes. This seat is not permitted to reschedule until those blockers are resolved.\n\nEscalation\nThis issue has been escalated to Meera Kulkarni (ESC-2026-00013) to resolve the blockers and update the schedule.\n\nNot visible to me\nNo relevant data is hidden from this seat.\n\nIf you need further action, please follow up with the assignee or address the unresolved subcontracts and engineering changes.",
+  "finding": {
+    "outcome": "answered",
+    "work_order": "WO-2026-00048",
+    "is_late": true,
+    "currency": "INR",
+    "blocking_causes": [
+      "subcontract_not_sent",
+      "subcontract_not_sent",
+      "engineering_change_pending",
+      "engineering_change_pending"
+    ],
+    "contributing_causes": [
+      "stopped_without_recorded_reason",
+      "schedule_recorded_downtime",
+      "schedule_due_date_passed",
+      "operation_not_started",
+      "downtime_on_order",
+      "workstation_downtime_recorded"
+    ],
+    "evidence_records": [
+      "WO-2026-00048",
+      "SCO-2026-00076",
+      "SCO-2026-00030",
+      "ECO-2026-00064",
+      "ECO-2026-00012",
+      "JC-2026-00142",
+      "SO-2026-00092"
+    ],
+    "potentially_blocked_work_orders": [],
+    "blocked_sales_orders": [
+      "SO-2026-00092"
+    ],
+    "rescheduled": [
+      {
+        "number": "WO-2026-00048",
+        "outcome": "refused"
+      }
+    ],
+    "customer_impact": "known",
+    "not_visible": [],
+    "escalations": [
+      {
+        "raised": true,
+        "number": "ESC-2026-00013",
+        "assignee": "Meera Kulkarni",
+        "reason_code": "other"
+      }
+    ],
+    "refusal_reason": null
+  },
+  "finding_record": {
+    "agent_memory_id": "f042727c-8a88-45da-9d40-ade55db05d5c",
+    "run_id": "06572c6ef010"
+  },
+  "escalations": [
+    {
+      "raised": true,
+      "escalation_id": "9c1af628-92cf-4380-99f7-bb407d2877a2",
+      "number": "ESC-2026-00013",
+      "status": "open",
+      "assignee": "Meera Kulkarni",
+      "due_at": "2026-09-17T20:17:51.164036+00:00"
+    }
+  ],
+  "agent_session_id": "c471c352-6352-426e-be57-2861d927790a",
+  "conflicts": [],
+  "seconds": 192.8,
+  "instance": "suryodaya",
+  "task_id": "escalate_blocked_wo48"
+}

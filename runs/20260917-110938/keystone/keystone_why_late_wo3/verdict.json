@@ -1,0 +1,9 @@
+{
+  "task_id": "keystone_why_late_wo3",
+  "instance": "keystone",
+  "verdict": "approve",
+  "reason": "reported not_started_past_planned_start; no writes",
+  "sample": false,
+  "run_id": "08f387c5bc0b",
+  "seconds": 56.1
+}

@@ -1,0 +1,98 @@
+{
+  "run_id": "35c3335b6704",
+  "stop_reason": "final_answer",
+  "final_answer": "WO-2026-00123: Late Work Order Analysis and Actions\n\nWhy late\n- WO-2026-00123 is late by 3 days (planned end: 2026-09-14, today: 2026-09-17).\n- The only recorded cause is that it is still in \"draft\" status and not released for production (\"not_released\" signal, WO-2026-00123). This is a contributing cause, not a hard blocker.\n\nWhat it blocks downstream\n- Several downstream work orders may be affected, including WO-2026-00124, WO-2026-00110, WO-2026-00095, WO-2026-00080, WO-2026-00065, WO-2026-00112, WO-2026-00107, WO-2026-00097, WO-2026-00092, WO-2026-00082, WO-2026-00077, WO-2026-00067, WO-2026-00062, and WO-2026-00052. These are potential consumers based on BOM matching, not confirmed blocks.\n- Potential customer impact is partly unknown because WO-2026-00123 and WO-2026-00124 are make-to-order without a linked sales order.\n- Potentially affected sales orders (via downstream work orders) include:\n  - SO-2026-00027, SO-2026-00192, SO-2026-00187, SO-2026-00056 (Tata Ficosa Automotive Systems)\n  - SO-2026-00053, SO-2026-00198, SO-2026-00164, SO-2026-00039 (Kirloskar Pumps Ltd)\n  - Customer impact is not fully determinable due to missing direct sales order links.\n\nRescheduling\n- WO-2026-00123 has been rescheduled: new dates are 2026-09-17 to 2026-09-24 (applied).\n- WO-2026-00124 has been rescheduled: new dates are 2026-09-25 to 2026-09-28 (applied).\n- WO-2026-00110, WO-2026-00112, and WO-2026-00107 could not be rescheduled by this seat (not approved; likely require higher permissions or admin action).\n- Several other downstream work orders could not be rescheduled because their dates are locked after submission and require admin intervention.\n\nNot visible to me\n- No data was hidden from this seat.\n\nSummary: The order is late due to not being released. I have rescheduled WO-2026-00123 and its immediate downstream WO-2026-00124. Other downstream orders and customer impact are only partly known and may require admin action to reschedule further.",
+  "finding": {
+    "outcome": "partial",
+    "work_order": "WO-2026-00123",
+    "is_late": true,
+    "currency": "INR",
+    "blocking_causes": [],
+    "contributing_causes": [
+      "not_released"
+    ],
+    "evidence_records": [
+      "WO-2026-00123",
+      "WO-2026-00124",
+      "WO-2026-00110",
+      "WO-2026-00095",
+      "WO-2026-00080",
+      "WO-2026-00065",
+      "WO-2026-00112",
+      "WO-2026-00107",
+      "WO-2026-00097",
+      "WO-2026-00092",
+      "WO-2026-00082",
+      "WO-2026-00077",
+      "WO-2026-00067",
+      "WO-2026-00062",
+      "WO-2026-00052"
+    ],
+    "potentially_blocked_work_orders": [
+      "WO-2026-00124",
+      "WO-2026-00110",
+      "WO-2026-00095",
+      "WO-2026-00080",
+      "WO-2026-00065",
+      "WO-2026-00112",
+      "WO-2026-00107",
+      "WO-2026-00097",
+      "WO-2026-00092",
+      "WO-2026-00082",
+      "WO-2026-00077",
+      "WO-2026-00067",
+      "WO-2026-00062",
+      "WO-2026-00052"
+    ],
+    "blocked_sales_orders": [
+      "SO-2026-00027",
+      "SO-2026-00192",
+      "SO-2026-00187",
+      "SO-2026-00056",
+      "SO-2026-00053",
+      "SO-2026-00198",
+      "SO-2026-00164",
+      "SO-2026-00039"
+    ],
+    "rescheduled": [
+      {
+        "number": "WO-2026-00123",
+        "new_start": "2026-09-17",
+        "new_end": "2026-09-24",
+        "outcome": "applied"
+      },
+      {
+        "number": "WO-2026-00124",
+        "new_start": "2026-09-25",
+        "new_end": "2026-09-28",
+        "outcome": "applied"
+      },
+      {
+        "number": "WO-2026-00110",
+        "outcome": "not_approved"
+      },
+      {
+        "number": "WO-2026-00112",
+        "outcome": "not_approved"
+      },
+      {
+        "number": "WO-2026-00107",
+        "outcome": "not_approved"
+      }
+    ],
+    "customer_impact": "partly unknown: make-to-order without a linked sales order: WO-2026-00123, WO-2026-00124",
+    "not_visible": [],
+    "escalations": [],
+    "refusal_reason": null
+  },
+  "finding_record": {
+    "agent_memory_id": "87e7b06b-d264-40a0-aea6-2878cb9f8284",
+    "run_id": "35c3335b6704"
+  },
+  "escalations": [],
+  "agent_session_id": null,
+  "conflicts": [],
+  "seconds": 128.0,
+  "instance": "suryodaya",
+  "task_id": "reschedule_fixture_chain"
+}

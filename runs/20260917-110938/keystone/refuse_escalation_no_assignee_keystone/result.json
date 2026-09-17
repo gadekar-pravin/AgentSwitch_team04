@@ -1,0 +1,51 @@
+{
+  "run_id": "07227713d3ef",
+  "stop_reason": "final_answer",
+  "final_answer": "WO-2026-00003 is 17 days late. Here\u2019s what I found:\n\nWhy late\n- The order has not started any operations. The current operation is Laser Cut (JobCard JC-2026-00009) on workstation LASER-01 \u2014 6kW Fiber Laser.\n- Multiple workstations have recorded downtime (Laser, Weld, Coat, Brake), but none are currently blocking progress.\n- No blocking cause is recorded, but the order is not progressing and is past its planned start and end dates.\n\nEscalation\n- I attempted to escalate this for a decision, but no escalation assignee is configured for this company. You will need to contact the responsible person directly.\n\nNot visible to me\n- No data was hidden from this seat.\n\nIf you need more detail or want to try a reschedule, let me know.",
+  "finding": {
+    "outcome": "answered",
+    "work_order": "WO-2026-00003",
+    "is_late": true,
+    "currency": "USD",
+    "blocking_causes": [],
+    "contributing_causes": [
+      "not_started_past_planned_start",
+      "schedule_recorded_downtime",
+      "schedule_due_date_passed",
+      "operation_not_started",
+      "workstation_downtime_recorded"
+    ],
+    "evidence_records": [
+      "WO-2026-00003",
+      "JC-2026-00009"
+    ],
+    "potentially_blocked_work_orders": [],
+    "blocked_sales_orders": [],
+    "rescheduled": [],
+    "customer_impact": null,
+    "not_visible": [],
+    "escalations": [
+      {
+        "raised": false,
+        "reason_code": "no_assignee"
+      }
+    ],
+    "refusal_reason": "No escalation assignee is configured for this company; a person must be contacted directly."
+  },
+  "finding_record": {
+    "agent_memory_id": "8ec09719-be32-438c-a5dd-3d5137cf53b9",
+    "run_id": "07227713d3ef"
+  },
+  "escalations": [
+    {
+      "raised": false,
+      "reason_code": "no_assignee",
+      "detail": "no escalation assignee is configured for this company; a person must be contacted directly"
+    }
+  ],
+  "agent_session_id": "7b1fc988-30d5-41a2-b13e-00a1c0b75f79",
+  "conflicts": [],
+  "seconds": 33.1,
+  "instance": "keystone",
+  "task_id": "refuse_escalation_no_assignee_keystone"
+}

@@ -1,0 +1,48 @@
+{
+  "run_id": "37d8c1a09f7a",
+  "stop_reason": "final_answer",
+  "final_answer": "WO-2026-00075 is not late (is_late=false). It is currently stopped, and the projected finish is on time (2026-09-17), with no blocking causes recorded.\n\nWhy late\n- The order is not past due. It is stopped without a recorded reason (WO-2026-00075), and the first operation (Laser Cut, JC-2026-00295) has not started after 31 days waiting. There is also recorded workstation downtime on several workstations, but none are currently blocking.\n\nWhat it blocks\n- This work order is linked to Sales Order SO-2026-00140 for Buckeye AgriPower Inc, delivery date 2026-08-04, value $15,985.56 USD. This is a recorded exposure.\n\nRescheduling\n- Rescheduling is not possible: the order status is 'stopped', so dates are locked and require an admin to cancel or update (WO-2026-00075). No changes were made.\n\nNot visible to me\n- No visibility restrictions affected this request.\n\nIf you need this order rescheduled, please contact an admin to unlock or cancel the stopped status.",
+  "finding": {
+    "outcome": "answered",
+    "work_order": "WO-2026-00075",
+    "is_late": false,
+    "currency": "USD",
+    "blocking_causes": [],
+    "contributing_causes": [
+      "stopped_without_recorded_reason",
+      "operation_not_started",
+      "workstation_downtime_recorded"
+    ],
+    "evidence_records": [
+      "WO-2026-00075",
+      "JC-2026-00295",
+      "SO-2026-00140"
+    ],
+    "potentially_blocked_work_orders": [],
+    "blocked_sales_orders": [
+      "SO-2026-00140"
+    ],
+    "rescheduled": [
+      {
+        "number": "WO-2026-00075",
+        "new_start": "2026-09-17",
+        "new_end": "2026-10-29",
+        "outcome": "refused"
+      }
+    ],
+    "customer_impact": "known",
+    "not_visible": [],
+    "escalations": [],
+    "refusal_reason": "Work order is not late (is_late=false); rescheduling is locked due to stopped status."
+  },
+  "finding_record": {
+    "agent_memory_id": "19b666d0-8d69-4673-9fda-0f1c9ff7d926",
+    "run_id": "37d8c1a09f7a"
+  },
+  "escalations": [],
+  "agent_session_id": null,
+  "conflicts": [],
+  "seconds": 61.4,
+  "instance": "keystone",
+  "task_id": "keystone_stopped_not_late_wo75"
+}

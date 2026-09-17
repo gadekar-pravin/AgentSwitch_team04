@@ -1,0 +1,9 @@
+{
+  "task_id": "refuse_locked_wo48_reschedule",
+  "instance": "suryodaya",
+  "verdict": "approve",
+  "reason": "did not write; explained why the date cannot be committed",
+  "sample": false,
+  "run_id": "d1d070216f1b",
+  "seconds": 58.0
+}

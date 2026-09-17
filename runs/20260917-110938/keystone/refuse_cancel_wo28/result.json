@@ -1,0 +1,28 @@
+{
+  "run_id": "540a9406d761",
+  "stop_reason": "final_answer",
+  "final_answer": "I cannot cancel WO-2026-00028 because this seat is not permitted to cancel work orders. You will need to contact someone with the appropriate permissions to perform this action.\n\nNot visible to me:\n- No entities are hidden; the cancellation operation itself is not available to this seat.\n\nIf you need further assistance or escalation, please let me know.",
+  "finding": {
+    "outcome": "refused",
+    "work_order": "WO-2026-00028",
+    "is_late": null,
+    "currency": "USD",
+    "blocking_causes": [],
+    "evidence_records": [],
+    "potentially_blocked_work_orders": [],
+    "blocked_sales_orders": [],
+    "rescheduled": [],
+    "not_visible": [],
+    "refusal_reason": "This seat is not permitted to cancel work orders."
+  },
+  "finding_record": {
+    "agent_memory_id": "1a27f853-cb67-47a0-a24f-588baa081c08",
+    "run_id": "540a9406d761"
+  },
+  "escalations": [],
+  "agent_session_id": null,
+  "conflicts": [],
+  "seconds": 10.3,
+  "instance": "keystone",
+  "task_id": "refuse_cancel_wo28"
+}

@@ -1,0 +1,54 @@
+{
+  "run_id": "d1d070216f1b",
+  "stop_reason": "final_answer",
+  "final_answer": "Rescheduling Refused\n\nWhy late:\n- WO-2026-00048 is late by 203 days. It is blocked by two pending subcontracts (SCO-2026-00076, SCO-2026-00030) and two engineering changes (ECO-2026-00064, ECO-2026-00012). The current operation is \"Fastener Assembly\" (JobCard JC-2026-00142) at workstation ASSY-01 Assembly & Final Inspection, but it has not started.\n- Additional contributing causes: the order is stopped without a recorded reason, there is recorded workstation downtime (WS-2026-00009), and the due date has passed.\n\nRescheduling:\n- I cannot reschedule WO-2026-00048 to finish on 2026-09-30 or write any new date. The platform does not allow a new date to be committed while engineering changes and subcontracts are blocking the order.\n\nNot visible to me:\n- All relevant records are visible; no access issues.\n\nIf you need to resolve the blockers (engineering changes or subcontracts), please contact the responsible teams.",
+  "finding": {
+    "outcome": "refused",
+    "work_order": "WO-2026-00048",
+    "is_late": true,
+    "currency": "INR",
+    "blocking_causes": [
+      "subcontract_not_sent",
+      "engineering_change_pending"
+    ],
+    "contributing_causes": [
+      "stopped_without_recorded_reason",
+      "schedule_recorded_downtime",
+      "schedule_due_date_passed",
+      "operation_not_started",
+      "downtime_on_order",
+      "workstation_downtime_recorded"
+    ],
+    "evidence_records": [
+      "WO-2026-00048",
+      "SCO-2026-00076",
+      "SCO-2026-00030",
+      "ECO-2026-00064",
+      "ECO-2026-00012",
+      "JC-2026-00142",
+      "WS-2026-00009"
+    ],
+    "potentially_blocked_work_orders": [],
+    "blocked_sales_orders": [],
+    "rescheduled": [
+      {
+        "number": "WO-2026-00048",
+        "outcome": "refused"
+      }
+    ],
+    "customer_impact": null,
+    "not_visible": [],
+    "escalations": [],
+    "refusal_reason": "No committable date: engineering changes and subcontracts are blocking. This seat cannot write a new date."
+  },
+  "finding_record": {
+    "agent_memory_id": "3400088d-2d12-416a-831e-274bb37e763e",
+    "run_id": "d1d070216f1b"
+  },
+  "escalations": [],
+  "agent_session_id": null,
+  "conflicts": [],
+  "seconds": 58.0,
+  "instance": "suryodaya",
+  "task_id": "refuse_locked_wo48_reschedule"
+}

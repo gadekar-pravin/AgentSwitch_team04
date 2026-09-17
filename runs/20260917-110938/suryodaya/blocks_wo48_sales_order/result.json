@@ -1,0 +1,50 @@
+{
+  "run_id": "914af9472dcb",
+  "stop_reason": "final_answer",
+  "final_answer": "WO-2026-00048 is late and is blocking a confirmed customer order.\n\nWhat it blocks:\n- Sales Order SO-2026-00092 for Kirloskar Pumps Ltd is directly affected. The delivery date was 2026-03-07, with a value of INR 494,476.64. This is a recorded exposure, not just a potential one.\n\nWhy late:\n- The order is blocked by two subcontracts not sent (SCO-2026-00076, SCO-2026-00030) and two pending engineering changes (ECO-2026-00064, ECO-2026-00012).\n- Additional contributing factors include the order being stopped without a recorded reason, recorded downtime, and operations not started (current operation: Fastener Assembly, JobCard JC-2026-00142 at ASSY-01 Assembly & Final Inspection).\n\nRescheduling:\n- No rescheduling has been proposed or applied for this order.\n\nNot visible to me:\n- No relevant data is hidden from this seat.\n\nSummary: The delay on WO-2026-00048 is blocking SO-2026-00092 for Kirloskar Pumps Ltd, with a known customer impact.",
+  "finding": {
+    "outcome": "answered",
+    "work_order": "WO-2026-00048",
+    "is_late": true,
+    "currency": "INR",
+    "blocking_causes": [
+      "subcontract_not_sent",
+      "engineering_change_pending"
+    ],
+    "contributing_causes": [
+      "stopped_without_recorded_reason",
+      "schedule_recorded_downtime",
+      "schedule_due_date_passed",
+      "operation_not_started",
+      "downtime_on_order",
+      "workstation_downtime_recorded"
+    ],
+    "evidence_records": [
+      "WO-2026-00048",
+      "SCO-2026-00076",
+      "SCO-2026-00030",
+      "ECO-2026-00064",
+      "ECO-2026-00012",
+      "SO-2026-00092"
+    ],
+    "potentially_blocked_work_orders": [],
+    "blocked_sales_orders": [
+      "SO-2026-00092"
+    ],
+    "rescheduled": [],
+    "customer_impact": "known",
+    "not_visible": [],
+    "escalations": [],
+    "refusal_reason": null
+  },
+  "finding_record": {
+    "agent_memory_id": "18f35712-2046-4b80-9a7f-d182bd0d9ac0",
+    "run_id": "914af9472dcb"
+  },
+  "escalations": [],
+  "agent_session_id": null,
+  "conflicts": [],
+  "seconds": 42.9,
+  "instance": "suryodaya",
+  "task_id": "blocks_wo48_sales_order"
+}

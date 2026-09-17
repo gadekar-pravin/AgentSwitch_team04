@@ -1,0 +1,63 @@
+{
+  "run_id": "d4f66210bb04",
+  "stop_reason": "final_answer",
+  "final_answer": "WO-2026-00049 is late.\n\nWhy late\n- The order is blocked by:\n  - Subcontract not sent (SCO-2026-00024, status: draft)\n  - Two pending engineering changes (ECO-2026-00073, ECO-2026-00013, both submitted and blocking)\n- Additional contributing factors include overdue material requests (MR-2026-00065, MR-2026-00054), recorded downtime on workstations (WS-2026-00008, ASSY-01 Assembly & Final Inspection), and the first operation (Robotic MIG Weld Frame, JC-2026-00145) has not started after 207 days waiting.\n\nWhat it blocks\n- This work order is directly linked to Sales Order SO-2026-00100 for Kirloskar Pumps Ltd, delivery date 2026-03-20, value \u20b9533,746.10. This customer is affected.\n\nRescheduling\n- No rescheduling is possible at this time. The order is blocked by events with no known resolution date (pending engineering changes and unsent subcontract), so no new dates can be committed.\n\nNot visible to me\n- All relevant records were visible; no access issues.\n\nSummary: WO-2026-00049 is late due to unsent subcontract and pending engineering changes, with additional material and downtime issues. It is blocking delivery to Kirloskar Pumps Ltd (SO-2026-00100). No reschedule is possible until blockers are resolved.",
+  "finding": {
+    "outcome": "answered",
+    "work_order": "WO-2026-00049",
+    "is_late": true,
+    "currency": "INR",
+    "blocking_causes": [
+      "subcontract_not_sent",
+      "engineering_change_pending",
+      "engineering_change_pending"
+    ],
+    "contributing_causes": [
+      "stopped_without_recorded_reason",
+      "material_request_open",
+      "material_request_open",
+      "schedule_recorded_downtime",
+      "schedule_due_date_passed",
+      "operation_not_started",
+      "downtime_on_order",
+      "downtime_on_order",
+      "workstation_downtime_recorded",
+      "workstation_downtime_recorded"
+    ],
+    "evidence_records": [
+      "WO-2026-00049",
+      "SCO-2026-00024",
+      "ECO-2026-00073",
+      "ECO-2026-00013",
+      "MR-2026-00065",
+      "MR-2026-00054",
+      "JC-2026-00145",
+      "WS-2026-00008",
+      "ASSY-01 Assembly & Final Inspection"
+    ],
+    "potentially_blocked_work_orders": [],
+    "blocked_sales_orders": [
+      "SO-2026-00100"
+    ],
+    "rescheduled": [
+      {
+        "number": "WO-2026-00049",
+        "outcome": "refused"
+      }
+    ],
+    "customer_impact": "known",
+    "not_visible": [],
+    "escalations": [],
+    "refusal_reason": null
+  },
+  "finding_record": {
+    "agent_memory_id": "c54c3f36-bc94-4c29-b8b0-216d17baac94",
+    "run_id": "d4f66210bb04"
+  },
+  "escalations": [],
+  "agent_session_id": null,
+  "conflicts": [],
+  "seconds": 67.4,
+  "instance": "suryodaya",
+  "task_id": "why_late_wo49_multi_cause"
+}

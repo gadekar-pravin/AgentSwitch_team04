@@ -1,0 +1,39 @@
+{
+  "run_id": "9a3178230153",
+  "stop_reason": "final_answer",
+  "final_answer": "WO-2026-00010 is late by 26 days.\n\nWhy late:\n- The order is currently stuck at the very first operation: Laser Cut (JobCard JC-2026-00035) on workstation LASER-01 \u2014 6kW Fiber Laser. This operation has not started yet, and the full quantity (100 units) is still pending.\n- Contributing causes include:\n  - Significant recorded downtime across multiple workstations, especially WS-2026-00003 (2310 minutes), WELD-03 \u2014 Robotic MIG Cell (1320 minutes, including breakdowns, material shortages, and tool changes), COAT-06 \u2014 Powder Coat Line (1140 minutes), LASER-01 \u2014 6kW Fiber Laser (990 minutes, including breakdowns and material shortages), and BRAKE-02 \u2014 175-ton Press Brake (480 minutes, operator unavailable).\n  - The planned end date has passed, and the operation has been waiting to start for 54 days.\n\nWhat it blocks:\n- No downstream work orders or sales orders are currently confirmed as blocked by this delay.\n\nRescheduling:\n- No rescheduling action was requested or performed.\n\nNot visible to me:\n- All relevant data was visible.\n\nEvidence records: WO-2026-00010, JC-2026-00035, WS-2026-00003\n\nIf you need further details or want to initiate rescheduling, please specify.",
+  "finding": {
+    "outcome": "answered",
+    "work_order": "WO-2026-00010",
+    "is_late": true,
+    "currency": "USD",
+    "blocking_causes": [],
+    "contributing_causes": [
+      "schedule_recorded_downtime",
+      "schedule_due_date_passed",
+      "operation_not_started",
+      "workstation_downtime_recorded"
+    ],
+    "evidence_records": [
+      "WO-2026-00010",
+      "JC-2026-00035",
+      "WS-2026-00003"
+    ],
+    "potentially_blocked_work_orders": [],
+    "blocked_sales_orders": [],
+    "rescheduled": [],
+    "customer_impact": null,
+    "not_visible": [],
+    "refusal_reason": null
+  },
+  "finding_record": {
+    "agent_memory_id": "b6372258-6962-496b-a0a9-dfcb44e7fdf7",
+    "run_id": "9a3178230153"
+  },
+  "escalations": [],
+  "agent_session_id": null,
+  "conflicts": [],
+  "seconds": 29.9,
+  "instance": "keystone",
+  "task_id": "job_card_current_operation_keystone_wo10"
+}

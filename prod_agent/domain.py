@@ -23,6 +23,8 @@ UNDATED_BLOCKERS = {
 }
 PENDING_ECO = {"draft", "submitted", "under_review"}
 DOWNTIME_LOOKBACK_DAYS = 90
+# finite_schedule codes that only restate lateness (renamed in Release 1, 2026-09-17).
+SCHEDULE_GENERIC_CAUSES = {"work_content_exceeds_due_date", "due_date_passed"}
 
 
 def _date(value) -> dt.date | None:
@@ -273,8 +275,12 @@ def diagnose(mcp: McpClient, ref: str) -> dict:
     route_ws = set()
     if entry:
         for cause in entry.get("causes", []):
-            if cause.get("code") != "work_content_exceeds_due_date":
-                sig(f"schedule_{cause['code']}", cause.get("workstation_label"), minutes=cause.get("minutes"))
+            code = cause.get("code")
+            if code in SCHEDULE_GENERIC_CAUSES:
+                continue  # restates "past due"; not a reason
+            if code == "recorded_downtime" and downtime_readable:
+                continue  # the DowntimeEntry records below are the evidence; the schedule's attribution is unreliable
+            sig(f"schedule_{code}", cause.get("workstation_label"), minutes=cause.get("minutes"))
         for ws_id in {op["workstation_id"] for op in entry.get("operations", []) if op.get("workstation_id")}:
             route_ws.add(ws_id)
             ws = load.get(ws_id, {})

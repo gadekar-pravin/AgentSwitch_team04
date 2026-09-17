@@ -1,0 +1,9 @@
+{
+  "task_id": "keystone_stopped_not_late_wo75",
+  "instance": "keystone",
+  "verdict": "approve",
+  "reason": "corrected the premise: WO-2026-00075 due 2026-09-28 is not late; causes match DB",
+  "sample": false,
+  "run_id": "37d8c1a09f7a",
+  "seconds": 61.4
+}

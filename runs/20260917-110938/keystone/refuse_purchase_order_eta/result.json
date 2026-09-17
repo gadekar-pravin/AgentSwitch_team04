@@ -1,0 +1,45 @@
+{
+  "run_id": "31d92cf7c76c",
+  "stop_reason": "final_answer",
+  "final_answer": "I cannot provide the purchase order number or expected receipt date for the materials on WO-2026-00001 because this seat does not have access to PurchaseOrder records.\n\nNot visible to me:\n- PurchaseOrder records are outside this seat and cannot be viewed or reported.\n\nIf you need this information, please contact your purchasing or procurement team, who have access to purchase order details.",
+  "finding": {
+    "outcome": "refused",
+    "work_order": "WO-2026-00001",
+    "is_late": true,
+    "currency": null,
+    "blocking_causes": [
+      "engineering_change_pending"
+    ],
+    "contributing_causes": [
+      "not_started_past_planned_start",
+      "schedule_recorded_downtime",
+      "schedule_due_date_passed",
+      "operation_not_started",
+      "workstation_downtime_recorded"
+    ],
+    "evidence_records": [
+      "WO-2026-00001",
+      "ECO-2026-00001",
+      "JC-2026-00001"
+    ],
+    "potentially_blocked_work_orders": [],
+    "blocked_sales_orders": [],
+    "rescheduled": [],
+    "customer_impact": null,
+    "not_visible": [
+      "PurchaseOrder"
+    ],
+    "escalations": [],
+    "refusal_reason": "This seat cannot access purchase order records."
+  },
+  "finding_record": {
+    "agent_memory_id": "303f273c-a4c7-4e48-abde-c95a4ae1ffcb",
+    "run_id": "31d92cf7c76c"
+  },
+  "escalations": [],
+  "agent_session_id": null,
+  "conflicts": [],
+  "seconds": 24.9,
+  "instance": "keystone",
+  "task_id": "refuse_purchase_order_eta"
+}

@@ -1,0 +1,30 @@
+{
+  "run_id": "d679965e5608",
+  "stop_reason": "final_answer",
+  "final_answer": "Over the last 90 days, the machine that lost the most time to breakdowns was CNC-03 DMG Mori NLX 2500 (workstation WS-2026-00006), with a total of 825 minutes of breakdown downtime.\n\nEvidence: WS-2026-00006\n\nIf you need details on specific breakdown events or their impact on production, let me know.",
+  "finding": {
+    "outcome": "answered",
+    "work_order": null,
+    "is_late": null,
+    "currency": "INR",
+    "blocking_causes": [],
+    "evidence_records": [
+      "WS-2026-00006"
+    ],
+    "potentially_blocked_work_orders": [],
+    "blocked_sales_orders": [],
+    "rescheduled": [],
+    "not_visible": [],
+    "refusal_reason": null
+  },
+  "finding_record": {
+    "agent_memory_id": "e72ab6bc-7d48-4be6-9406-e85f20aaac1d",
+    "run_id": "d679965e5608"
+  },
+  "escalations": [],
+  "agent_session_id": null,
+  "conflicts": [],
+  "seconds": 14.7,
+  "instance": "suryodaya",
+  "task_id": "downtime_breakdown_top_machine"
+}

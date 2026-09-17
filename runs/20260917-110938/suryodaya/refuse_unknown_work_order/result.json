@@ -1,0 +1,30 @@
+{
+  "run_id": "d59db81b7578",
+  "stop_reason": "final_answer",
+  "final_answer": "WO-2026-09999 does not exist or is not visible to this seat, so I cannot check its status, diagnose lateness, check downstream impact, or reschedule it.\n\nWhy late\n- I could not check this work order because it does not exist or is not visible to this seat.\n\nWhat it blocks\n- I could not check downstream impact because the work order is not available.\n\nRescheduling\n- I could not propose or apply any reschedule because the work order is not available.\n\nNot visible to me\n- WO-2026-09999 is not found or not visible to this seat.\n\nIf you believe this is an error, please verify the work order number or contact your system administrator.",
+  "finding": {
+    "outcome": "refused",
+    "work_order": "WO-2026-09999",
+    "is_late": null,
+    "currency": "INR",
+    "blocking_causes": [],
+    "evidence_records": [],
+    "potentially_blocked_work_orders": [],
+    "blocked_sales_orders": [],
+    "rescheduled": [],
+    "customer_impact": null,
+    "not_visible": [],
+    "escalations": [],
+    "refusal_reason": "Work order WO-2026-09999 does not exist or is not visible to this seat."
+  },
+  "finding_record": {
+    "agent_memory_id": "9a70cf02-3236-4ceb-b568-eff24559cfd4",
+    "run_id": "d59db81b7578"
+  },
+  "escalations": [],
+  "agent_session_id": null,
+  "conflicts": [],
+  "seconds": 14.6,
+  "instance": "suryodaya",
+  "task_id": "refuse_unknown_work_order"
+}
