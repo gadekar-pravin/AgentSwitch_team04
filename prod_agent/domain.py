@@ -104,11 +104,33 @@ def seat_capability(mcp: McpClient, tool: str) -> dict:
     if not present:
         entity = tool.split(".")[0]
         entities = seat_entities(mcp)
-        if entity not in entities:
+        if entity in entities:
+            # A wrong operation name (e.g. JobCard.read) says nothing about access to the entity.
+            ops = sorted(t[len(entity) + 1:] for t in mcp.tool_names() if t.startswith(entity + "."))
+            result["entity_in_catalogue"] = True
+            result["available_tools"] = [f"{entity}.{op}" for op in ops]
+            result["note"] = f"{entity} IS visible to this seat; '{tool}' is just not an operation name. Do not list {entity} in not_visible."
+        elif _rest_status(mcp, entity) in (401, 403):
+            # The platform has the entity but refuses this seat: a real, reportable limit.
+            result["outside_seat"] = True
+            result["note"] = f"{entity} exists on the platform but is outside this seat (REST 403). Put '{entity}' in not_visible."
+        else:
             # An invented name proves nothing about access; point at the real entities instead.
             result["warning"] = f"'{entity}' is not an entity on this platform seat; check a real entity before concluding"
             result["similar_entities"] = [e for e in entities if _words(e) & _words(entity)][:5]
     return result
+
+
+def _rest_status(mcp: McpClient, entity: str) -> int | None:
+    """403 = real entity outside the seat, 404 = no such entity (checked live on both books, 2026-09-17)."""
+    from .mcp_client import _http
+    session = mcp.session
+    try:
+        url = f"{session.base}/api/{entity}?limit=1"
+        status, _ = session.with_reauth(lambda: _http(url, token=session.token))
+        return status
+    except Exception:
+        return None
 
 
 def company_context(mcp: McpClient) -> dict:

@@ -1,0 +1,30 @@
+{
+  "run_id": "b4d79ebbb72e",
+  "stop_reason": "final_answer",
+  "final_answer": "The work order WO-2026-09999 does not exist or is not visible to this seat, so I cannot check its status, diagnose lateness, see what it may block downstream, or reschedule it.\n\nWhy late\n- I could not check the order because it does not exist or is not visible.\n\nWhat it blocks\n- No downstream or customer impact can be determined.\n\nRescheduling\n- No rescheduling actions could be taken.\n\nNot visible to me\n- WO-2026-09999 is not found or not visible to this seat.\n\nIf you believe this is an error, please verify the work order number or contact your system administrator.",
+  "finding": {
+    "outcome": "refused",
+    "work_order": "WO-2026-09999",
+    "is_late": null,
+    "currency": "USD",
+    "blocking_causes": [],
+    "evidence_records": [],
+    "potentially_blocked_work_orders": [],
+    "blocked_sales_orders": [],
+    "rescheduled": [],
+    "customer_impact": null,
+    "not_visible": [],
+    "escalations": [],
+    "refusal_reason": "The work order WO-2026-09999 does not exist or is not visible to this seat."
+  },
+  "finding_record": {
+    "agent_memory_id": "f7b9470e-91e5-46e6-9771-8bae8694ebe5",
+    "run_id": "b4d79ebbb72e"
+  },
+  "escalations": [],
+  "agent_session_id": null,
+  "conflicts": [],
+  "seconds": 13.3,
+  "instance": "keystone",
+  "task_id": "refuse_unknown_work_order"
+}

@@ -152,7 +152,13 @@ def test_bug_b3_fixed_admin_cancel_tool_not_listed(suryodaya):
 def test_payroll_entity_not_in_seat(suryodaya):
     cap = domain.seat_capability(suryodaya, "SalarySlip.list")
     assert cap["in_catalogue"] is False
-    assert "warning" in cap
+    assert cap.get("outside_seat") is True and "warning" not in cap
+
+
+def test_wrong_operation_name_is_not_a_visibility_limit(suryodaya):
+    cap = domain.seat_capability(suryodaya, "JobCard.read")
+    assert cap["entity_in_catalogue"] is True
+    assert "JobCard.list" in cap["available_tools"]
 
 
 def test_late_list_most_overdue_first(suryodaya):

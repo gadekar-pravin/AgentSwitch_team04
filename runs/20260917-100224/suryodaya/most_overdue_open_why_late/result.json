@@ -1,0 +1,91 @@
+{
+  "run_id": "b973a75dfd92",
+  "stop_reason": "final_answer",
+  "final_answer": "Here is the status for the most overdue open work order:\n\nWO-2026-00047 (Battery Tray Base Pan (formed)) is 204 days past its planned end date.\n\nWhy late\n- The order is blocked because a required subcontract (SCO-2026-00038) has not been sent. There is no known ready date for this event.\n- Additional contributing causes: the order is stopped without a recorded reason, the first operation (Laser Cut Blank, JC-2026-00139) has not started, and there is recorded downtime on related workstations (WS-2026-00002, PB-01 Amada HFE 1303, ASSY-01 Assembly & Final Inspection).\n\nWhat it blocks\n- Several downstream work orders may be affected, including WO-2026-00116, WO-2026-00101, WO-2026-00086, WO-2026-00071, WO-2026-00056, WO-2026-00106, WO-2026-00091, WO-2026-00076, and WO-2026-00061. These are potential consumers based on BOM matching.\n- Potential customer impact: Sales orders SO-2026-00021, SO-2026-00171, SO-2026-00151, and SO-2026-00050 for Bharat EV Motors Ltd may be affected, with delivery dates ranging from 2026-06-10 to 2026-09-16 and values up to INR 2,693,620.93. These are potential exposures, not confirmed blocks.\n\nRescheduling\n- No rescheduling can be committed for WO-2026-00047 or its dependants because the blocking subcontract event has no known date. All reschedule attempts are refused for this reason.\n\nNot visible to me\n- All relevant records were accessible.\n\nIf you need escalation or further action, please advise.",
+  "finding": {
+    "outcome": "answered",
+    "work_order": "WO-2026-00047",
+    "is_late": true,
+    "currency": "INR",
+    "blocking_causes": [
+      "subcontract_not_sent"
+    ],
+    "contributing_causes": [
+      "stopped_without_recorded_reason",
+      "schedule_recorded_downtime",
+      "operation_not_started",
+      "downtime_on_order",
+      "workstation_downtime_recorded",
+      "schedule_due_date_passed"
+    ],
+    "evidence_records": [
+      "WO-2026-00047",
+      "SCO-2026-00038",
+      "JC-2026-00139",
+      "WS-2026-00002",
+      "PB-01 Amada HFE 1303",
+      "ASSY-01 Assembly & Final Inspection"
+    ],
+    "potentially_blocked_work_orders": [
+      "WO-2026-00116",
+      "WO-2026-00101",
+      "WO-2026-00086",
+      "WO-2026-00071",
+      "WO-2026-00056",
+      "WO-2026-00106",
+      "WO-2026-00091",
+      "WO-2026-00076",
+      "WO-2026-00061"
+    ],
+    "blocked_sales_orders": [
+      "SO-2026-00021",
+      "SO-2026-00171",
+      "SO-2026-00151",
+      "SO-2026-00050"
+    ],
+    "rescheduled": [
+      {
+        "number": "WO-2026-00047",
+        "outcome": "refused"
+      },
+      {
+        "number": "WO-2026-00116",
+        "outcome": "refused"
+      },
+      {
+        "number": "WO-2026-00101",
+        "outcome": "refused"
+      },
+      {
+        "number": "WO-2026-00086",
+        "outcome": "refused"
+      },
+      {
+        "number": "WO-2026-00106",
+        "outcome": "refused"
+      },
+      {
+        "number": "WO-2026-00091",
+        "outcome": "refused"
+      },
+      {
+        "number": "WO-2026-00076",
+        "outcome": "refused"
+      }
+    ],
+    "customer_impact": "known",
+    "not_visible": [],
+    "escalations": [],
+    "refusal_reason": null
+  },
+  "finding_record": {
+    "agent_memory_id": "09b40124-f3f4-44db-bf40-747e17817d3d",
+    "run_id": "b973a75dfd92"
+  },
+  "escalations": [],
+  "agent_session_id": null,
+  "conflicts": [],
+  "seconds": 81.5,
+  "instance": "suryodaya",
+  "task_id": "most_overdue_open_why_late"
+}

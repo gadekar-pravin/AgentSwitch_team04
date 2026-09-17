@@ -52,6 +52,8 @@ Output goes to `runs/<timestamp>/<instance>/<task>/`: `task.json`, `fixture.json
 - **Writes only what the seat can write.** Submitted work orders are date-locked for `manufacturing_user` (verified live), so the agent writes dates on drafts only and proposes the rest.
 - **Two gates on writes.** Every write needs approval (a human prompt in the CLI; in the harness, only the team's own fixture rows) and must be in the allowed-id set.
 - **The finding goes into the database.** `record_finding` stores the structured conclusion in AgentMemory (private to our team), so verifiers read state, not prose.
+- **Cannot loop past its budget.** A repeated read with identical arguments returns a note instead of running again, and in the last steps the loop forces `record_finding` (after a required escalation), so a run always leaves its finding in the database.
+- **Tells a real access limit from a guessed name.** `seat_capability` asks REST: 403 means the entity exists but is outside the seat (reported in `not_visible`), 404 means the name was invented, and a wrong operation name on a visible entity (e.g. `JobCard.read`) returns the real operations.
 - **Nothing is hardcoded to one country.** Country and currency come from `Company`, and missing tools (e.g. SalesOrder on Keystone) are detected, not assumed.
 
 ## Seat limits the agent reports rather than works around (2026-09-17)

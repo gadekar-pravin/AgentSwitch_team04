@@ -1,0 +1,9 @@
+{
+  "task_id": "refuse_cost_variance_keystone",
+  "instance": "keystone",
+  "verdict": "approve",
+  "reason": "declined to compute a variance without recorded cost",
+  "sample": false,
+  "run_id": "ee28ccedec6e",
+  "seconds": 28.1
+}

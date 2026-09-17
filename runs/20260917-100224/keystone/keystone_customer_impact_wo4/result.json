@@ -1,0 +1,42 @@
+{
+  "run_id": "bb620910eb58",
+  "stop_reason": "final_answer",
+  "final_answer": "WO-2026-00004 is late and puts a customer order at risk.\n\nWhy late:\n- The work order is 33 days past its planned end date and has not started (WO-2026-00004).\n- The current operation \"Laser Cut\" (JobCard JC-2026-00013) on workstation LASER-01 \u2014 6kW Fiber Laser has not begun.\n- There have been recorded downtimes on multiple workstations, including material shortages, breakdowns, tool changes, setup changes, quality issues, and operator unavailability.\n\nWhat it blocks:\n- This work order is directly linked to Sales Order SO-2026-00003 for Tri-State Farm Equipment, with a delivery date of 2026-06-09 and a value of $158,929.52 USD.\n- This is a confirmed exposure: the customer order is at risk due to the delay in WO-2026-00004.\n\nRescheduling:\n- No rescheduling action has been taken in this run.\n\nNot visible to me:\n- All relevant data was visible.\n\nIf you need further details or action, please specify.",
+  "finding": {
+    "outcome": "answered",
+    "work_order": "WO-2026-00004",
+    "is_late": true,
+    "currency": "USD",
+    "blocking_causes": [],
+    "contributing_causes": [
+      "not_started_past_planned_start",
+      "schedule_recorded_downtime",
+      "schedule_due_date_passed",
+      "operation_not_started",
+      "workstation_downtime_recorded"
+    ],
+    "evidence_records": [
+      "WO-2026-00004",
+      "JC-2026-00013",
+      "SO-2026-00003"
+    ],
+    "potentially_blocked_work_orders": [],
+    "blocked_sales_orders": [
+      "SO-2026-00003"
+    ],
+    "rescheduled": [],
+    "customer_impact": "known",
+    "not_visible": [],
+    "refusal_reason": null
+  },
+  "finding_record": {
+    "agent_memory_id": "72ab491f-45ff-4b77-9323-cabb86804c9c",
+    "run_id": "bb620910eb58"
+  },
+  "escalations": [],
+  "agent_session_id": null,
+  "conflicts": [],
+  "seconds": 37.3,
+  "instance": "keystone",
+  "task_id": "keystone_customer_impact_wo4"
+}

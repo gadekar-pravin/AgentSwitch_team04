@@ -1,0 +1,35 @@
+{
+  "run_id": "af9cd85ad74f",
+  "stop_reason": "final_answer",
+  "final_answer": "What it blocks:\nThe delay on WO-2026-00048 (Pump Mounting Bracket Assembly) directly affects Sales Order SO-2026-00092 for Kirloskar Pumps Ltd. This order is confirmed, undelivered, and has a delivery date of 2026-03-07, with a value of \u20b9494,476.64 INR.\n\nThere are no other downstream work orders or potential consumer work orders currently identified as affected.\n\nCustomer impact:\nKirloskar Pumps Ltd is the affected customer, as this sales order is directly linked to the delayed work order.\n\nNo visibility issues were encountered in this request.",
+  "finding": {
+    "outcome": "answered",
+    "work_order": "WO-2026-00048",
+    "is_late": null,
+    "currency": "INR",
+    "blocking_causes": [],
+    "evidence_records": [
+      "WO-2026-00048",
+      "SO-2026-00092"
+    ],
+    "potentially_blocked_work_orders": [],
+    "blocked_sales_orders": [
+      "SO-2026-00092"
+    ],
+    "rescheduled": [],
+    "customer_impact": "known",
+    "not_visible": [],
+    "escalations": [],
+    "refusal_reason": null
+  },
+  "finding_record": {
+    "agent_memory_id": "e064ae15-1aef-42f3-84d7-aa8706384ac1",
+    "run_id": "af9cd85ad74f"
+  },
+  "escalations": [],
+  "agent_session_id": null,
+  "conflicts": [],
+  "seconds": 21.8,
+  "instance": "suryodaya",
+  "task_id": "blocks_wo48_sales_order"
+}

@@ -24,7 +24,7 @@ How you work:
 - Escalation: when something needs a person (a locked order, a blocker with no known date, data this seat cannot see, a conflicting edit) and the escalate tool is available, call escalate ONCE for the request with: the work order, records checked, what is missing, and the action requested. Record the result in escalations. If it returns raised=false (for example no assignee), say plainly that no one could be assigned and who should be contacted; never claim an escalation that was not raised.
 - Do not accept a false premise. If the user says an order is late but diagnose_work_order shows is_late=false, say it is not past due (record is_late=false) and still report what is holding it.
 - Costs: expected_cost and actual_cost are on the work order (diagnose_work_order). Variance = actual - expected, in the company currency. If both are 0 or missing, no cost has been recorded: say so and do not compute a variance (cost=null, outcome partial or refused).
-- Platform names: job cards = JobCard, downtime log = DowntimeEntry, engineering changes = EngineeringChangeOrder, sales/customer orders = SalesOrder, purchase orders and receipt dates = PurchaseOrder, stock movements = StockEntry, operators/people and their contact details = Employee, payroll = SalarySlip (another app). For anything else call seat_entities. Before refusing for lack of access, confirm with seat_capability on the REAL entity, and put that exact entity name in not_visible. If seat_capability returns a warning, you used a wrong name: retry with a real one.
+- Platform names: job cards = JobCard, downtime log = DowntimeEntry, engineering changes = EngineeringChangeOrder, sales/customer orders = SalesOrder, purchase orders and receipt dates = PurchaseOrder, stock movements = StockEntry, operators/people and their contact details = Employee, payroll = SalarySlip (another app). For anything else call seat_entities. Before refusing for lack of access, confirm with seat_capability on the REAL entity, and put that exact entity name in not_visible. If seat_capability returns outside_seat, that entity is a real limit: put it in not_visible. If it returns entity_in_catalogue, the entity IS visible (you only guessed the operation name): never list it in not_visible. If it returns a warning, you used a wrong name: retry with a real one.
 - Refuse when the data cannot support an answer or the seat is not permitted: the work order does not exist, the entity is not visible, or the requested change is outside this seat (for example changing a sales order delivery date, cancelling a work order, or reading payroll). Refusing correctly is a success, not a failure.
 - Before your final answer you MUST call record_finding exactly once with the structured result, including outcome "refused" when you refuse.
 Final answer: short, plain language, sections Why late / What it blocks / Rescheduling / Not visible to me."""
@@ -94,6 +94,7 @@ class ProductionAgent:
         self.needs_person: list[str] = []  # evidence from tool results that a person must act
         self.finding: dict | None = None
         self.finding_record: dict | None = None
+        self._seen_calls: dict[tuple[str, str], int] = {}
         if llm is None:
             from openai import OpenAI
             # The SDK backs off on 429/5xx; the default 2 retries is too few for a 30k tokens-per-minute key.
@@ -129,6 +130,37 @@ class ProductionAgent:
                               "reason_code": {"type": "string", "enum": list(domain.ESCALATION_REASON_CODES)}},
                              ["reason", "reason_code"]))
         return specs
+
+    # Reads whose answer cannot usefully change within one run. propose_reschedule is left out on purpose:
+    # re-proposing refreshes updated_at in a shared book.
+    REPEAT_GUARDED = {"company_context", "list_late_work_orders", "diagnose_work_order", "downstream_impact",
+                      "downtime_summary", "seat_entities", "seat_capability"}
+
+    def _repeat_note(self, name: str, args: dict, step: int) -> dict | None:
+        """Stop the model looping on an identical read (seen live: 9 identical seat_capability calls)."""
+        if name not in self.REPEAT_GUARDED:
+            return None
+        key = (name, json.dumps(args, sort_keys=True))
+        if key not in self._seen_calls:
+            self._seen_calls[key] = step
+            return None
+        return {"repeat": True,
+                "detail": f"{name} was already called with these arguments at step {self._seen_calls[key]}; "
+                          "that result above is still current. Do not call it again.",
+                "instruction": "if the answer needs a record this seat cannot see, say so; "
+                               "otherwise use what you have and call record_finding"}
+
+    def _wrap_up_choice(self, step: int):
+        """Force the finding into the database before the step budget runs out."""
+        remaining = self.max_steps - step
+        if self.finding is not None:
+            return "none" if remaining == 1 else None
+        escalation_due = self.escalate_mode and self.needs_person and not self.escalations
+        if escalation_due and remaining == 3:
+            return {"type": "function", "function": {"name": "escalate"}}
+        if remaining <= 2:
+            return {"type": "function", "function": {"name": "record_finding"}}
+        return None
 
     def _dispatch(self, name: str, args: dict):
         ref = args.get("work_order")
@@ -208,6 +240,10 @@ class ProductionAgent:
         for step in range(self.max_steps):
             # Reasoning models (gpt-5.x, o-series) reject a non-default temperature.
             sampling = {"temperature": 0} if self.model.startswith(("gpt-4", "gpt-3")) else {}
+            choice = self._wrap_up_choice(step)
+            if choice is not None:
+                sampling["tool_choice"] = choice
+                self.trace({"type": "wrap_up", "step": step, "tool_choice": choice})
             resp = self.llm.chat.completions.create(model=self.model, messages=messages,
                                                     tools=self.tool_specs(), **sampling)
             msg = resp.choices[0].message
@@ -224,7 +260,8 @@ class ProductionAgent:
                 t0 = time.time()
                 try:
                     args = json.loads(call.function.arguments or "{}")
-                    result = self._dispatch(call.function.name, args)
+                    result = (self._repeat_note(call.function.name, args, step)
+                              or self._dispatch(call.function.name, args))
                     error = None
                 except McpError as e:
                     result, error = {"error": e.message, "kind": e.kind}, e.kind

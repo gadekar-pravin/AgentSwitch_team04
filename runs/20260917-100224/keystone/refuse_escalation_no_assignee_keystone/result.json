@@ -1,0 +1,56 @@
+{
+  "run_id": "5100147fbdcd",
+  "stop_reason": "final_answer",
+  "final_answer": "Why late\n- WO-2026-00003 is 17 days late (planned end: 2026-08-31, today: 2026-09-17).\n- The order has not started; the first operation (Laser Cut, JobCard JC-2026-00009) is still open and has been waiting 56 days.\n- Multiple workstations have recorded downtime: material shortage, breakdown, tool change, setup change, quality issues, and operator unavailable (see records: WS-2026-00003, WELD-03 \u2014 Robotic MIG Cell, COAT-06 \u2014 Powder Coat Line, LASER-01 \u2014 6kW Fiber Laser, BRAKE-02 \u2014 175-ton Press Brake).\n- No single blocking cause is recorded, but these issues have contributed to the delay.\n\nWhat it blocks\n- No downstream work orders or sales orders are currently recorded as blocked or exposed by this delay.\n\nRescheduling\n- No reschedule was attempted in this request.\n\nEscalation\n- Escalation could not be raised: no escalation assignee is configured for this company. You must contact a responsible person directly to decide how to proceed.\n\nNot visible to me\n- All relevant records were visible.\n\nIf you need further action, please contact your production manager or responsible decision-maker directly, as the platform escalation is not configured.",
+  "finding": {
+    "outcome": "answered",
+    "work_order": "WO-2026-00003",
+    "is_late": true,
+    "currency": "USD",
+    "blocking_causes": [],
+    "contributing_causes": [
+      "not_started_past_planned_start",
+      "schedule_recorded_downtime",
+      "schedule_due_date_passed",
+      "operation_not_started",
+      "workstation_downtime_recorded"
+    ],
+    "evidence_records": [
+      "WO-2026-00003",
+      "JC-2026-00009",
+      "WS-2026-00003",
+      "WELD-03 \u2014 Robotic MIG Cell",
+      "COAT-06 \u2014 Powder Coat Line",
+      "LASER-01 \u2014 6kW Fiber Laser",
+      "BRAKE-02 \u2014 175-ton Press Brake"
+    ],
+    "potentially_blocked_work_orders": [],
+    "blocked_sales_orders": [],
+    "rescheduled": [],
+    "customer_impact": null,
+    "not_visible": [],
+    "escalations": [
+      {
+        "raised": false,
+        "reason_code": "no_assignee"
+      }
+    ],
+    "refusal_reason": "No escalation assignee is configured for this company; a person must be contacted directly."
+  },
+  "finding_record": {
+    "agent_memory_id": "49aec578-fd1a-4ea8-9953-e511071c1139",
+    "run_id": "5100147fbdcd"
+  },
+  "escalations": [
+    {
+      "raised": false,
+      "reason_code": "no_assignee",
+      "detail": "no escalation assignee is configured for this company; a person must be contacted directly"
+    }
+  ],
+  "agent_session_id": "d5808477-a65a-4936-a424-31f497f348fc",
+  "conflicts": [],
+  "seconds": 34.4,
+  "instance": "keystone",
+  "task_id": "refuse_escalation_no_assignee_keystone"
+}

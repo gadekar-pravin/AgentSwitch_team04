@@ -1,0 +1,43 @@
+{
+  "run_id": "ba8c5420a003",
+  "stop_reason": "final_answer",
+  "final_answer": "WO-2026-00010 is late by 26 days.\n\nWhy late:\n- The order is currently stuck at the very first operation: Laser Cut (JobCard JC-2026-00035) on workstation LASER-01 \u2014 6kW Fiber Laser. This operation has not started, and the job card is still open with 0/100 units completed.\n- Contributing causes include:\n  - Significant recorded downtime across multiple workstations, especially WS-2026-00003 (2310 minutes), WELD-03 \u2014 Robotic MIG Cell (1320 minutes, including breakdowns, material shortages, and tool changes), COAT-06 \u2014 Powder Coat Line (1140 minutes), LASER-01 \u2014 6kW Fiber Laser (990 minutes, including breakdowns and material shortages), and BRAKE-02 \u2014 175-ton Press Brake (480 minutes, operator unavailable).\n  - The planned end date has passed, and the operation has been waiting to start for 54 days.\n\nWhat it blocks:\n- No downstream work orders or sales orders are currently recorded as blocked or potentially affected.\n\nRescheduling:\n- No rescheduling action has been taken in this run.\n\nNot visible to me:\n- All relevant data was visible.\n\nEvidence records: WO-2026-00010, JC-2026-00035, WS-2026-00003, WELD-03 \u2014 Robotic MIG Cell, COAT-06 \u2014 Powder Coat Line, LASER-01 \u2014 6kW Fiber Laser, BRAKE-02 \u2014 175-ton Press Brake\n\nIf you need further details or want to explore rescheduling, let me know.",
+  "finding": {
+    "outcome": "answered",
+    "work_order": "WO-2026-00010",
+    "is_late": true,
+    "currency": "USD",
+    "blocking_causes": [],
+    "contributing_causes": [
+      "schedule_recorded_downtime",
+      "schedule_due_date_passed",
+      "operation_not_started",
+      "workstation_downtime_recorded"
+    ],
+    "evidence_records": [
+      "WO-2026-00010",
+      "JC-2026-00035",
+      "WS-2026-00003",
+      "WELD-03 \u2014 Robotic MIG Cell",
+      "COAT-06 \u2014 Powder Coat Line",
+      "LASER-01 \u2014 6kW Fiber Laser",
+      "BRAKE-02 \u2014 175-ton Press Brake"
+    ],
+    "potentially_blocked_work_orders": [],
+    "blocked_sales_orders": [],
+    "rescheduled": [],
+    "customer_impact": null,
+    "not_visible": [],
+    "refusal_reason": null
+  },
+  "finding_record": {
+    "agent_memory_id": "2627501b-f2ac-4f95-b908-7708a3711a57",
+    "run_id": "ba8c5420a003"
+  },
+  "escalations": [],
+  "agent_session_id": null,
+  "conflicts": [],
+  "seconds": 29.9,
+  "instance": "keystone",
+  "task_id": "job_card_current_operation_keystone_wo10"
+}

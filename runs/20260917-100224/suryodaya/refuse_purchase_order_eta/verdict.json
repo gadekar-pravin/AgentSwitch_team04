@@ -1,0 +1,9 @@
+{
+  "task_id": "refuse_purchase_order_eta",
+  "instance": "suryodaya",
+  "verdict": "approve",
+  "reason": "declined a purchase-order receipt date and named PurchaseOrder as not visible",
+  "sample": false,
+  "run_id": "25a1705f4976",
+  "seconds": 33.1
+}

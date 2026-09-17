@@ -1,0 +1,30 @@
+{
+  "run_id": "66e30bdc9e46",
+  "stop_reason": "final_answer",
+  "final_answer": "Over the last 90 days, the machine that lost the most time to breakdowns was:\n\n- CNC-04 \u2014 VMC 40-taper (Workstation WS-2026-00004)\n- Total breakdown downtime: 960 minutes\n\nEvidence: WS-2026-00004\n\nIf you need details on the specific breakdown events or other machines, let me know.",
+  "finding": {
+    "outcome": "answered",
+    "work_order": null,
+    "is_late": null,
+    "currency": "USD",
+    "blocking_causes": [],
+    "evidence_records": [
+      "WS-2026-00004"
+    ],
+    "potentially_blocked_work_orders": [],
+    "blocked_sales_orders": [],
+    "rescheduled": [],
+    "not_visible": [],
+    "refusal_reason": null
+  },
+  "finding_record": {
+    "agent_memory_id": "de84239f-9991-4252-ab90-cd4389a9bec2",
+    "run_id": "66e30bdc9e46"
+  },
+  "escalations": [],
+  "agent_session_id": null,
+  "conflicts": [],
+  "seconds": 14.5,
+  "instance": "keystone",
+  "task_id": "downtime_breakdown_top_machine"
+}

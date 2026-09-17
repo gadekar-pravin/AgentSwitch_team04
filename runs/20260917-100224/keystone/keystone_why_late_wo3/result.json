@@ -1,0 +1,55 @@
+{
+  "run_id": "dacd188f6c30",
+  "stop_reason": "final_answer",
+  "final_answer": "WO-2026-00003 is late.\n\nWhy late\n- The order is 17 days past its planned end date (WO-2026-00003).\n- No operations have started; the first operation (\"Laser Cut\" on LASER-01 \u2014 6kW Fiber Laser, JobCard JC-2026-00009) is still open and waiting.\n- There have been significant recorded downtimes on related workstations:\n  - WS-2026-00003: 2,310 minutes\n  - WELD-03 \u2014 Robotic MIG Cell: 1,320 minutes (material shortage, tool change, breakdown)\n  - COAT-06 \u2014 Powder Coat Line: 1,140 minutes (setup change, quality issue)\n  - LASER-01 \u2014 6kW Fiber Laser: 990 minutes (material shortage, breakdown, quality issue)\n  - BRAKE-02 \u2014 175-ton Press Brake: 480 minutes (operator unavailable)\n- Contributing causes: not started past planned start, operation not started, and multiple workstation downtimes.\n\nWhat it blocks\n- This work order is directly linked to Sales Order SO-2026-00123 for Cardinal Tillage Works (delivery date: 2026-07-10, value: $80,095.52 USD). Customer impact is known and confirmed.\n\nRescheduling\n- Rescheduling is not permitted for this work order: dates are locked after submit and require an admin cancel. No changes were made.\n\nNot visible to me\n- No visibility restrictions affected this request.\n\nIf you need the dates changed, please contact an admin to cancel or unlock the order.",
+  "finding": {
+    "outcome": "answered",
+    "work_order": "WO-2026-00003",
+    "is_late": true,
+    "currency": "USD",
+    "blocking_causes": [],
+    "contributing_causes": [
+      "not_started_past_planned_start",
+      "schedule_recorded_downtime",
+      "schedule_due_date_passed",
+      "operation_not_started",
+      "workstation_downtime_recorded"
+    ],
+    "evidence_records": [
+      "WO-2026-00003",
+      "JC-2026-00009",
+      "WS-2026-00003",
+      "WELD-03 \u2014 Robotic MIG Cell",
+      "COAT-06 \u2014 Powder Coat Line",
+      "LASER-01 \u2014 6kW Fiber Laser",
+      "BRAKE-02 \u2014 175-ton Press Brake",
+      "SO-2026-00123"
+    ],
+    "potentially_blocked_work_orders": [],
+    "blocked_sales_orders": [
+      "SO-2026-00123"
+    ],
+    "rescheduled": [
+      {
+        "number": "WO-2026-00003",
+        "new_start": "2026-09-17",
+        "new_end": "2026-10-26",
+        "outcome": "refused"
+      }
+    ],
+    "customer_impact": "known",
+    "not_visible": [],
+    "escalations": [],
+    "refusal_reason": "Rescheduling is not permitted for this work order: dates are locked after submit and require an admin cancel."
+  },
+  "finding_record": {
+    "agent_memory_id": "13940d12-8356-4a23-b88e-2bc729cb6b4e",
+    "run_id": "dacd188f6c30"
+  },
+  "escalations": [],
+  "agent_session_id": null,
+  "conflicts": [],
+  "seconds": 62.5,
+  "instance": "keystone",
+  "task_id": "keystone_why_late_wo3"
+}

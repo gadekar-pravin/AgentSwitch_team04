@@ -1,0 +1,114 @@
+{
+  "run_id": "b734f6c2e121",
+  "stop_reason": "final_answer",
+  "final_answer": "WO-2026-00123: Late Work Order Analysis and Rescheduling Attempt\n\nWhy late\n- WO-2026-00123 is late (planned end: 2026-09-14, today: 2026-09-17, status: draft, is_late=true).\n- The only recorded cause is that it is \"not released\" (WO-2026-00123). This is a contributing cause, not a full blocker\u2014no blocking cause with no known ready date is present.\n\nWhat it blocks\n- Several downstream work orders may be affected, including WO-2026-00124, WO-2026-00110, WO-2026-00095, WO-2026-00080, WO-2026-00065, WO-2026-00112, WO-2026-00107, WO-2026-00097, WO-2026-00092, WO-2026-00082, and WO-2026-00077. These are potential consumers by BOM match, not confirmed blocks.\n- Potential customer impact is partly unknown because WO-2026-00123 and WO-2026-00124 are make-to-order without a linked sales order.\n- Potentially affected sales orders (via downstream work orders) include:\n    - SO-2026-00027, SO-2026-00192, SO-2026-00187, SO-2026-00056 (Tata Ficosa Automotive Systems)\n    - SO-2026-00053, SO-2026-00198, SO-2026-00164, SO-2026-00039 (Kirloskar Pumps Ltd)\n  These are potential exposures, not confirmed blocks.\n\nRescheduling\n- I attempted to reschedule WO-2026-00123 and downstream work orders where permitted.\n- WO-2026-00123 changed underneath during this process (someone else edited it), so no changes could be applied. All further rescheduling was refused for this reason.\n- This issue has been escalated to Meera Kulkarni (ESC-2026-00010) for manual intervention and re-planning.\n\nNot visible to me\n- All relevant records were visible; no access issues.\n\nSummary: WO-2026-00123 is late due to not being released. Downstream work orders and several sales orders may be affected, but the customer impact is partly unknown. Rescheduling could not be completed because the order changed during this process. The issue has been escalated for human resolution.",
+  "finding": {
+    "outcome": "partial",
+    "work_order": "WO-2026-00123",
+    "is_late": true,
+    "currency": "INR",
+    "blocking_causes": [],
+    "contributing_causes": [
+      "not_released"
+    ],
+    "evidence_records": [
+      "WO-2026-00123",
+      "WO-2026-00124",
+      "WO-2026-00110",
+      "WO-2026-00095",
+      "WO-2026-00080",
+      "WO-2026-00065",
+      "WO-2026-00112",
+      "WO-2026-00107",
+      "WO-2026-00097",
+      "WO-2026-00092",
+      "WO-2026-00082",
+      "WO-2026-00077",
+      "SO-2026-00027",
+      "SO-2026-00192",
+      "SO-2026-00187",
+      "SO-2026-00056",
+      "SO-2026-00053",
+      "SO-2026-00198",
+      "SO-2026-00164",
+      "SO-2026-00039"
+    ],
+    "potentially_blocked_work_orders": [
+      "WO-2026-00124",
+      "WO-2026-00110",
+      "WO-2026-00095",
+      "WO-2026-00080",
+      "WO-2026-00065",
+      "WO-2026-00112",
+      "WO-2026-00107",
+      "WO-2026-00097",
+      "WO-2026-00092",
+      "WO-2026-00082",
+      "WO-2026-00077"
+    ],
+    "blocked_sales_orders": [
+      "SO-2026-00027",
+      "SO-2026-00192",
+      "SO-2026-00187",
+      "SO-2026-00056",
+      "SO-2026-00053",
+      "SO-2026-00198",
+      "SO-2026-00164",
+      "SO-2026-00039"
+    ],
+    "rescheduled": [
+      {
+        "number": "WO-2026-00123",
+        "outcome": "changed_underneath"
+      },
+      {
+        "number": "WO-2026-00124",
+        "outcome": "refused"
+      },
+      {
+        "number": "WO-2026-00110",
+        "outcome": "refused"
+      },
+      {
+        "number": "WO-2026-00112",
+        "outcome": "refused"
+      },
+      {
+        "number": "WO-2026-00107",
+        "outcome": "refused"
+      }
+    ],
+    "customer_impact": "partly unknown: make-to-order without a linked sales order: WO-2026-00123, WO-2026-00124",
+    "not_visible": [],
+    "escalations": [
+      {
+        "raised": true,
+        "number": "ESC-2026-00010",
+        "assignee": "Meera Kulkarni",
+        "reason_code": "unresolved_after_retries"
+      }
+    ],
+    "refusal_reason": "WO-2026-00123 changed underneath during reschedule attempt; downstream work orders could not be rescheduled. Manual intervention required."
+  },
+  "finding_record": {
+    "agent_memory_id": "3f5a2407-3fac-475a-85b1-1bc838cece4c",
+    "run_id": "b734f6c2e121"
+  },
+  "escalations": [
+    {
+      "raised": true,
+      "escalation_id": "8401d082-fb69-4ab8-906a-1e7cacc6c471",
+      "number": "ESC-2026-00010",
+      "status": "open",
+      "assignee": "Meera Kulkarni",
+      "due_at": "2026-09-17T19:04:43.233353+00:00"
+    }
+  ],
+  "agent_session_id": "e6a163f8-89b0-406d-8279-126f65f37eb8",
+  "conflicts": [
+    "WO-2026-00123"
+  ],
+  "seconds": 103.8,
+  "instance": "suryodaya",
+  "task_id": "concurrent_edit_before_write"
+}

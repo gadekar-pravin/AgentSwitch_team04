@@ -1,0 +1,109 @@
+{
+  "run_id": "bc3618c4eed3",
+  "stop_reason": "final_answer",
+  "final_answer": "WO-2026-00123 is late.\n\nWhy late\n- WO-2026-00123 is 3 days past its planned end date (was due 2026-09-14, today is 2026-09-17).\n- The only recorded cause is that it is still in \"draft\" status and has not been released (\"not_released\" signal, WO-2026-00123). There are no operations or job cards started.\n\nWhat it blocks\n- Several downstream work orders may be affected, including WO-2026-00124, WO-2026-00110, WO-2026-00095, WO-2026-00080, WO-2026-00065, WO-2026-00112, WO-2026-00107, WO-2026-00097, WO-2026-00092, WO-2026-00082, WO-2026-00077, WO-2026-00067, WO-2026-00062, WO-2026-00052. These are potential consumers by BOM matching, not confirmed blocks.\n- Potential customer impact includes Tata Ficosa Automotive Systems and Kirloskar Pumps Ltd, with sales orders SO-2026-00027, SO-2026-00192, SO-2026-00187, SO-2026-00056, SO-2026-00053, SO-2026-00198, SO-2026-00164, SO-2026-00039. The total value and delivery dates are recorded in the evidence.\n- Customer impact is partly unknown because WO-2026-00123 and WO-2026-00124 are make-to-order but have no linked sales order.\n\nRescheduling\n- I have rescheduled WO-2026-00123 to start 2026-09-17 and finish 2026-09-24 (applied).\n- WO-2026-00124 was also rescheduled to 2026-09-25 to 2026-09-28 (applied).\n- I was not permitted to reschedule WO-2026-00110, WO-2026-00112, or WO-2026-00107 (status: not_approved). These may require higher-level approval or admin action.\n\nNot visible to me\n- All relevant records were visible; no access issues.\n\nIf you need further action on the downstream work orders that could not be rescheduled, please contact an admin.",
+  "finding": {
+    "outcome": "partial",
+    "work_order": "WO-2026-00123",
+    "is_late": true,
+    "currency": "INR",
+    "blocking_causes": [],
+    "contributing_causes": [
+      "not_released"
+    ],
+    "evidence_records": [
+      "WO-2026-00123",
+      "WO-2026-00124",
+      "WO-2026-00110",
+      "WO-2026-00095",
+      "WO-2026-00080",
+      "WO-2026-00065",
+      "WO-2026-00112",
+      "WO-2026-00107",
+      "WO-2026-00097",
+      "WO-2026-00092",
+      "WO-2026-00082",
+      "WO-2026-00077",
+      "SO-2026-00027",
+      "SO-2026-00192",
+      "SO-2026-00187",
+      "SO-2026-00056",
+      "SO-2026-00053",
+      "SO-2026-00198",
+      "SO-2026-00164",
+      "SO-2026-00039"
+    ],
+    "potentially_blocked_work_orders": [
+      "WO-2026-00124",
+      "WO-2026-00110",
+      "WO-2026-00095",
+      "WO-2026-00080",
+      "WO-2026-00065",
+      "WO-2026-00112",
+      "WO-2026-00107",
+      "WO-2026-00097",
+      "WO-2026-00092",
+      "WO-2026-00082",
+      "WO-2026-00077",
+      "WO-2026-00067",
+      "WO-2026-00062",
+      "WO-2026-00052"
+    ],
+    "blocked_sales_orders": [
+      "SO-2026-00027",
+      "SO-2026-00192",
+      "SO-2026-00187",
+      "SO-2026-00056",
+      "SO-2026-00053",
+      "SO-2026-00198",
+      "SO-2026-00164",
+      "SO-2026-00039"
+    ],
+    "rescheduled": [
+      {
+        "number": "WO-2026-00123",
+        "new_start": "2026-09-17",
+        "new_end": "2026-09-24",
+        "outcome": "applied"
+      },
+      {
+        "number": "WO-2026-00124",
+        "new_start": "2026-09-25",
+        "new_end": "2026-09-28",
+        "outcome": "applied"
+      },
+      {
+        "number": "WO-2026-00110",
+        "new_start": "2026-09-25",
+        "new_end": "2026-10-06",
+        "outcome": "not_approved"
+      },
+      {
+        "number": "WO-2026-00112",
+        "new_start": "2026-09-29",
+        "new_end": "2026-10-11",
+        "outcome": "not_approved"
+      },
+      {
+        "number": "WO-2026-00107",
+        "new_start": "2026-09-29",
+        "new_end": "2026-10-05",
+        "outcome": "not_approved"
+      }
+    ],
+    "customer_impact": "partly unknown: make-to-order without a linked sales order: WO-2026-00123, WO-2026-00124",
+    "not_visible": [],
+    "escalations": [],
+    "refusal_reason": null
+  },
+  "finding_record": {
+    "agent_memory_id": "88dfeba0-b6bf-42d3-955f-626f2155e0fd",
+    "run_id": "bc3618c4eed3"
+  },
+  "escalations": [],
+  "agent_session_id": null,
+  "conflicts": [],
+  "seconds": 100.8,
+  "instance": "suryodaya",
+  "task_id": "reschedule_fixture_chain"
+}

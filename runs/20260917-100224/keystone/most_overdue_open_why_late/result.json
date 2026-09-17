@@ -1,0 +1,55 @@
+{
+  "run_id": "7ea6033ac4fd",
+  "stop_reason": "final_answer",
+  "final_answer": "Here is the status for the most overdue open work order:\n\nWhy late\n- WO-2026-00004 (Grain Cart Ladder Guard Weldment) is 33 days past its planned end date.\n- The order has not started; the first operation (Laser Cut, JobCard JC-2026-00013) is still open and waiting to begin on workstation LASER-01 \u2014 6kW Fiber Laser.\n- Contributing causes include: not started past planned start, recorded workstation downtimes (notably on WELD-03 \u2014 Robotic MIG Cell, COAT-06 \u2014 Powder Coat Line, LASER-01, and BRAKE-02), and the due date has passed.\n\nWhat it blocks\n- This work order is directly linked to Sales Order SO-2026-00003 for Tri-State Farm Equipment, with a delivery date of 2026-06-09 and a value of $158,929.52 USD. This customer is affected.\n\nRescheduling\n- Rescheduling is not permitted for this work order: dates are locked after submit; changing them needs an admin cancel.\n\nNot visible to me\n- No visibility restrictions affected this answer.\n\nIf you need this order rescheduled, please contact an admin to unlock or cancel it first.",
+  "finding": {
+    "outcome": "answered",
+    "work_order": "WO-2026-00004",
+    "is_late": true,
+    "currency": "USD",
+    "blocking_causes": [],
+    "contributing_causes": [
+      "not_started_past_planned_start",
+      "schedule_recorded_downtime",
+      "schedule_due_date_passed",
+      "operation_not_started",
+      "workstation_downtime_recorded"
+    ],
+    "evidence_records": [
+      "WO-2026-00004",
+      "JC-2026-00013",
+      "WS-2026-00003",
+      "WELD-03 \u2014 Robotic MIG Cell",
+      "COAT-06 \u2014 Powder Coat Line",
+      "LASER-01 \u2014 6kW Fiber Laser",
+      "BRAKE-02 \u2014 175-ton Press Brake",
+      "SO-2026-00003"
+    ],
+    "potentially_blocked_work_orders": [],
+    "blocked_sales_orders": [
+      "SO-2026-00003"
+    ],
+    "rescheduled": [
+      {
+        "number": "WO-2026-00004",
+        "new_start": "2026-09-17",
+        "new_end": "2026-11-20",
+        "outcome": "refused"
+      }
+    ],
+    "customer_impact": "known",
+    "not_visible": [],
+    "escalations": [],
+    "refusal_reason": "Rescheduling is not permitted for this work order: dates are locked after submit; changing them needs an admin cancel."
+  },
+  "finding_record": {
+    "agent_memory_id": "5018e554-3247-4944-9e07-48df71fb3072",
+    "run_id": "7ea6033ac4fd"
+  },
+  "escalations": [],
+  "agent_session_id": null,
+  "conflicts": [],
+  "seconds": 131.4,
+  "instance": "keystone",
+  "task_id": "most_overdue_open_why_late"
+}

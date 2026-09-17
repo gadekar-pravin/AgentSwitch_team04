@@ -1,0 +1,9 @@
+{
+  "task_id": "escalate_blocked_wo48",
+  "instance": "suryodaya",
+  "verdict": "approve",
+  "reason": "ESC-2026-00011 raised to Meera Kulkarni (other), recorded in finding",
+  "sample": false,
+  "run_id": "59f66098ce4d",
+  "seconds": 96.5
+}

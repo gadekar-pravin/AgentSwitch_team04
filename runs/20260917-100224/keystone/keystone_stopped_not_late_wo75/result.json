@@ -1,0 +1,47 @@
+{
+  "run_id": "3a35c5db3c32",
+  "stop_reason": "final_answer",
+  "final_answer": "WO-2026-00075 is not late (is_late=false). It is currently stopped, and its projected finish is on time (2026-09-17). However, production has not started, and the order is waiting at the first operation (Laser Cut, JobCard JC-2026-00295) on workstation LASER-01 \u2014 6kW Fiber Laser. There are also recorded downtimes on several workstations, but none are currently blocking.\n\nWhy late\n- The order is not past due. It is stopped without a recorded reason and has not started its first operation (JC-2026-00295).\n- Contributing factors: stopped status, operation not started, and past workstation downtimes (not currently blocking).\n\nWhat it blocks\n- This work order is directly linked to Sales Order SO-2026-00140 for Buckeye AgriPower Inc, delivery date 2026-08-04, value $15,985.56 USD. This is a recorded exposure.\n\nRescheduling\n- Rescheduling is not possible: the order is stopped and dates are locked after submit. Changing them requires an admin to cancel or intervene.\n\nNot visible to me\n- No visibility restrictions; all relevant data was accessible.\n\nIf you need this order rescheduled, please contact an admin to unlock or cancel the stopped status.",
+  "finding": {
+    "outcome": "answered",
+    "work_order": "WO-2026-00075",
+    "is_late": false,
+    "currency": "USD",
+    "blocking_causes": [],
+    "contributing_causes": [
+      "stopped_without_recorded_reason",
+      "operation_not_started",
+      "workstation_downtime_recorded"
+    ],
+    "evidence_records": [
+      "WO-2026-00075",
+      "JC-2026-00295",
+      "SO-2026-00140"
+    ],
+    "potentially_blocked_work_orders": [],
+    "blocked_sales_orders": [
+      "SO-2026-00140"
+    ],
+    "rescheduled": [
+      {
+        "number": "WO-2026-00075",
+        "new_start": "2026-09-17",
+        "new_end": "2026-10-29",
+        "outcome": "refused"
+      }
+    ],
+    "customer_impact": "known",
+    "not_visible": [],
+    "refusal_reason": "Work order is not late (is_late=false); rescheduling is locked due to stopped status and requires admin intervention."
+  },
+  "finding_record": {
+    "agent_memory_id": "00cde60a-eb1a-47a5-b431-95849d317a0d",
+    "run_id": "3a35c5db3c32"
+  },
+  "escalations": [],
+  "agent_session_id": null,
+  "conflicts": [],
+  "seconds": 63.5,
+  "instance": "keystone",
+  "task_id": "keystone_stopped_not_late_wo75"
+}

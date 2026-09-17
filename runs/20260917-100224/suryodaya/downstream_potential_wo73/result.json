@@ -1,0 +1,61 @@
+{
+  "run_id": "008bcb5e3c7c",
+  "stop_reason": "final_answer",
+  "final_answer": "WO-2026-00073 is late.\n\nWhy late\n- The order is blocked by two pending engineering changes: ECO-2026-00037 (critical, under review) and ECO-2026-00016 (medium, submitted).\n- The current operation is \"Laser Cut Side Rail\" (JobCard JC-2026-00223) on workstation LASER-01 Trumpf TruLaser 3030, and it has not started.\n- Additional contributing factors include: not started past planned start, recorded workstation downtime, and previous downtime on related workstations.\n\nWhat it blocks\n- This order may affect several downstream work orders by BOM matching, including WO-2026-00116, WO-2026-00101, WO-2026-00086, WO-2026-00071, WO-2026-00056, WO-2026-00106, WO-2026-00091, WO-2026-00076, and WO-2026-00061. These are potential consumers, not confirmed blocks.\n- Potential customer impact: Sales orders SO-2026-00021, SO-2026-00171, SO-2026-00151, and SO-2026-00050 for Bharat EV Motors Ltd may be affected, with delivery dates ranging from 2026-06-10 to 2026-09-16 and values from \u20b9456,695.40 to \u20b92,693,620.93.\n\nRescheduling\n- No rescheduling has been proposed or applied.\n\nNot visible to me\n- All relevant data was visible.\n\nIf you need more detail on any downstream order or want to attempt rescheduling, let me know.",
+  "finding": {
+    "outcome": "answered",
+    "work_order": "WO-2026-00073",
+    "is_late": true,
+    "currency": "INR",
+    "blocking_causes": [
+      "engineering_change_pending",
+      "engineering_change_pending"
+    ],
+    "contributing_causes": [
+      "not_started_past_planned_start",
+      "schedule_recorded_downtime",
+      "schedule_due_date_passed",
+      "operation_not_started",
+      "downtime_on_order",
+      "downtime_on_order",
+      "workstation_downtime_recorded"
+    ],
+    "evidence_records": [
+      "WO-2026-00073",
+      "JC-2026-00223",
+      "ECO-2026-00037",
+      "ECO-2026-00016"
+    ],
+    "potentially_blocked_work_orders": [
+      "WO-2026-00116",
+      "WO-2026-00101",
+      "WO-2026-00086",
+      "WO-2026-00071",
+      "WO-2026-00056",
+      "WO-2026-00106",
+      "WO-2026-00091",
+      "WO-2026-00076",
+      "WO-2026-00061"
+    ],
+    "blocked_sales_orders": [
+      "SO-2026-00021",
+      "SO-2026-00171",
+      "SO-2026-00151",
+      "SO-2026-00050"
+    ],
+    "rescheduled": [],
+    "customer_impact": "known",
+    "not_visible": [],
+    "refusal_reason": null
+  },
+  "finding_record": {
+    "agent_memory_id": "202d0ff9-7f59-4b03-9855-4e46f102f2b3",
+    "run_id": "008bcb5e3c7c"
+  },
+  "escalations": [],
+  "agent_session_id": null,
+  "conflicts": [],
+  "seconds": 47.1,
+  "instance": "suryodaya",
+  "task_id": "downstream_potential_wo73"
+}

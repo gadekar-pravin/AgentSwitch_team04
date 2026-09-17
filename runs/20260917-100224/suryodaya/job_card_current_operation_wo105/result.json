@@ -1,0 +1,50 @@
+{
+  "run_id": "67d6c90b4668",
+  "stop_reason": "final_answer",
+  "final_answer": "WO-2026-00105 is late.\n\nWhy late:\n- The order is blocked by three pending engineering changes: ECO-2026-00088 (draft), ECO-2026-00023 (submitted), and ECO-2026-00001 (submitted, high priority). These must be resolved before production can proceed.\n- The order has not started, even though the planned start date was 2026-08-15.\n- The first operation (\"Laser Cut Blank\") on JobCard JC-2026-00321 at workstation LASER-01 Trumpf TruLaser 3030 has not begun.\n- There has been recorded downtime on the relevant workstations, including 300.62 minutes of planned maintenance on LASER-01, 473.99 minutes on CNC-02 (planned maintenance and power failure), and 154.65 minutes on CNC-01 (setup change and material shortage).\n\nWhere exactly is it stuck:\n- The order is stuck at the very first operation (\"Laser Cut Blank\", JobCard JC-2026-00321, LASER-01 Trumpf TruLaser 3030), which has not started due to the blocking engineering changes.\n\nWhat it blocks:\n- No downstream work orders or sales orders are currently linked or potentially blocked by this order.\n\nRescheduling:\n- No rescheduling has been proposed or applied.\n\nNot visible to me:\n- All relevant data was visible.\n\nIf you need further action on the engineering changes or want to escalate, please let me know.",
+  "finding": {
+    "outcome": "answered",
+    "work_order": "WO-2026-00105",
+    "is_late": true,
+    "currency": "INR",
+    "blocking_causes": [
+      "engineering_change_pending"
+    ],
+    "contributing_causes": [
+      "not_started_past_planned_start",
+      "schedule_recorded_downtime",
+      "schedule_due_date_passed",
+      "operation_not_started",
+      "downtime_on_order",
+      "workstation_downtime_recorded"
+    ],
+    "evidence_records": [
+      "WO-2026-00105",
+      "JC-2026-00321",
+      "ECO-2026-00088",
+      "ECO-2026-00023",
+      "ECO-2026-00001",
+      "WS-2026-00001",
+      "LASER-01 Trumpf TruLaser 3030",
+      "CNC-01 Haas VF-3 VMC",
+      "CNC-02 Haas VF-2 VMC"
+    ],
+    "potentially_blocked_work_orders": [],
+    "blocked_sales_orders": [],
+    "rescheduled": [],
+    "customer_impact": "none linked",
+    "not_visible": [],
+    "escalations": [],
+    "refusal_reason": null
+  },
+  "finding_record": {
+    "agent_memory_id": "287e4aa1-3cad-4624-9bb0-d93725a3dbc8",
+    "run_id": "67d6c90b4668"
+  },
+  "escalations": [],
+  "agent_session_id": null,
+  "conflicts": [],
+  "seconds": 33.6,
+  "instance": "suryodaya",
+  "task_id": "job_card_current_operation_wo105"
+}
