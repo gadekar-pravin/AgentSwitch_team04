@@ -16,6 +16,7 @@ cp .env.example .env   # fill in both passwords and OPENAI_API_KEY; .env is git-
 ```bash
 python -m prod_agent --instance suryodaya "WO-2026-00048 is late. Why, what does it block, and reschedule what you can."
 python -m prod_agent --instance keystone  "..." --apply    # offers writes; each needs y at the prompt
+python -m prod_agent --instance suryodaya "..." --escalate # may raise one real escalation to a person
 ```
 
 Each run writes `runs/adhoc/<timestamp>-<instance>/trace.jsonl` and `result.json`.
@@ -45,6 +46,9 @@ Output goes to `runs/<timestamp>/<instance>/<task>/`: `task.json`, `fixture.json
 ## How the agent stays safe in a shared book
 
 - **Re-reads before writing.** Each proposal carries `updated_at`. If the row changed or its status moved, the write is skipped with `changed_underneath`.
+- **Stops after a conflict.** Once any order changes underneath a run, every further write in that run is refused and the conflict goes to a person. The harness proves this live: `concurrent_edit_before_write` moves a fixture order's dates between the agent's proposal and its write.
+- **Hands work to a person.** With `--escalate` (or `"escalate": true` in a task), a locked, undatable or conflicting order is escalated through the platform's escalation queue to the assignee the platform names. If no assignee exists (Keystone today), the agent says so instead of claiming a handover. `record_finding` is refused until a required escalation has been attempted. Harness-raised escalations are withdrawn after scoring.
+- **Potential, not confirmed, downstream.** Orders found by BOM matching are recorded as `potentially_blocked_work_orders` with `confidence: potential`, because stock or another order may cover the demand. A sales order is `linked` only when it is on the late order itself.
 - **Writes only what the seat can write.** Submitted work orders are date-locked for `manufacturing_user` (verified live), so the agent writes dates on drafts only and proposes the rest.
 - **Two gates on writes.** Every write needs approval (a human prompt in the CLI; in the harness, only the team's own fixture rows) and must be in the allowed-id set.
 - **The finding goes into the database.** `record_finding` stores the structured conclusion in AgentMemory (private to our team), so verifiers read state, not prose.

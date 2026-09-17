@@ -17,8 +17,10 @@ How you work:
 - Call company_context first. Use its currency and country; never assume a country, tax regime or currency.
 - Other teams change this data while you run. Proposals carry a snapshot; apply_reschedule re-reads before writing.
 - For "why is it late": run diagnose_work_order. Separate BLOCKING causes (no known ready date) from contributing ones. If the seat cannot see something (listed in not_visible_to_this_seat), say so plainly instead of guessing.
-- For "what does it block": run downstream_impact. Report blocked work orders and sales orders (customer, delivery date, value). Read customer_impact literally: only say no customer is affected when it starts with "none linked". If it is "undeterminable" or "partly unknown", say the customer impact is unknown and why.
+- For "what does it block": run downstream_impact. Work orders there are POTENTIAL consumers found by BOM matching (confidence "potential"): call them "may be affected", never "blocked", because stock or another order may cover the demand. A sales order linked on the late order itself (confidence "linked") is recorded exposure; one reached through a potential consumer is potential exposure. Report customer, delivery date and value. Read customer_impact literally: only say no customer is affected when it starts with "none linked". If it is "undeterminable" or "partly unknown", say the customer impact is unknown and why.
 - For "reschedule": run propose_reschedule. Only proposals with writable_by_seat=true can be written, and only if apply_reschedule is available. Everything else is a recommendation that needs a person (explain why_not_writable).
+- If apply_reschedule returns changed_underneath, someone else edited that order during this run. Do not retry or re-propose: every further write in this run is refused. Report the conflict, and escalate if escalate is available.
+- Escalation: when something needs a person (a locked order, a blocker with no known date, data this seat cannot see, a conflicting edit) and the escalate tool is available, call escalate ONCE for the request with: the work order, records checked, what is missing, and the action requested. Record the result in escalations. If it returns raised=false (for example no assignee), say plainly that no one could be assigned and who should be contacted; never claim an escalation that was not raised.
 - Do not accept a false premise. If the user says an order is late but diagnose_work_order shows is_late=false, say it is not past due (record is_late=false) and still report what is holding it.
 - Costs: expected_cost and actual_cost are on the work order (diagnose_work_order). Variance = actual - expected, in the company currency. If both are 0 or missing, no cost has been recorded: say so and do not compute a variance (cost=null, outcome partial or refused).
 - Platform names: job cards = JobCard, downtime log = DowntimeEntry, sales/customer orders = SalesOrder, payroll = SalarySlip (another app). For anything else call seat_entities. Before refusing for lack of access, confirm with seat_capability on the REAL entity, and put that exact entity name in not_visible. If seat_capability returns a warning, you used a wrong name: retry with a real one.
@@ -41,17 +43,21 @@ RECORD_FINDING_SCHEMA = {
         "blocking_causes": {"type": "array", "items": {"type": "string"}, "description": "signal codes that block the order"},
         "contributing_causes": {"type": "array", "items": {"type": "string"}},
         "evidence_records": {"type": "array", "items": {"type": "string"}, "description": "record numbers cited"},
-        "blocked_work_orders": {"type": "array", "items": {"type": "string"}},
+        "potentially_blocked_work_orders": {"type": "array", "items": {"type": "string"},
+                                            "description": "possible consumers found by BOM matching; not confirmed blocks"},
         "blocked_sales_orders": {"type": "array", "items": {"type": "string"}},
         "rescheduled": {"type": "array", "items": {"type": "object", "properties": {
             "number": {"type": "string"}, "new_start": {"type": ["string", "null"]},
             "new_end": {"type": ["string", "null"]}, "outcome": {"type": "string"}}, "required": ["number", "outcome"]}},
         "customer_impact": {"type": "string", "description": "customer_impact value from downstream_impact, verbatim"},
         "not_visible": {"type": "array", "items": {"type": "string"}},
+        "escalations": {"type": "array", "description": "result of each escalate call, as returned", "items": {"type": "object", "properties": {
+            "raised": {"type": "boolean"}, "number": {"type": ["string", "null"]}, "assignee": {"type": ["string", "null"]},
+            "reason_code": {"type": ["string", "null"]}}, "required": ["raised"]}},
         "refusal_reason": {"type": ["string", "null"]},
     },
-    "required": ["outcome", "work_order", "is_late", "currency", "blocking_causes", "evidence_records", "blocked_work_orders",
-                 "blocked_sales_orders", "rescheduled", "not_visible", "refusal_reason"],
+    "required": ["outcome", "work_order", "is_late", "currency", "blocking_causes", "evidence_records",
+                 "potentially_blocked_work_orders", "blocked_sales_orders", "rescheduled", "not_visible", "refusal_reason"],
 }
 
 
@@ -67,7 +73,8 @@ class ProductionAgent:
     def __init__(self, mcp: McpClient, *, model: str | None = None, run_id: str | None = None,
                  apply_mode: bool = False, approve: Callable[[dict], bool] | None = None,
                  allowed_write_ids: set[str] | None = None, trace: Callable[[dict], None] | None = None,
-                 max_steps: int = 20, llm=None):
+                 max_steps: int = 20, llm=None, escalate_mode: bool = False, session_title: str | None = None,
+                 max_escalations: int = 1):
         self.mcp = mcp
         self.model = model or config.env("OPENAI_MODEL", "gpt-4.1")
         self.run_id = run_id or uuid.uuid4().hex[:12]
@@ -77,6 +84,13 @@ class ProductionAgent:
         self.trace = trace or (lambda event: None)
         self.max_steps = max_steps
         self._proposals: dict[str, dict] = {}
+        self.escalate_mode = escalate_mode
+        self.session_title = session_title or f"team04 production agent run {self.run_id}"
+        self.max_escalations = max_escalations
+        self.session_id: str | None = None
+        self.escalations: list[dict] = []
+        self.conflicts: list[str] = []  # work orders someone else changed during this run
+        self.needs_person: list[str] = []  # evidence from tool results that a person must act
         self.finding: dict | None = None
         self.finding_record: dict | None = None
         if llm is None:
@@ -101,6 +115,12 @@ class ProductionAgent:
         if self.apply_mode:
             specs.append(_fn("apply_reschedule", "Write one proposal returned by propose_reschedule (needs human approval).",
                              {"work_order_id": {"type": "string"}}, ["work_order_id"]))
+        if self.escalate_mode:
+            specs.append(_fn("escalate", "Hand this request to a person via the platform escalation queue. Call at most once.",
+                             {"work_order": {"type": ["string", "null"]},
+                              "reason": {"type": "string", "description": "work order, records checked, what is missing, action requested"},
+                              "reason_code": {"type": "string", "enum": list(domain.ESCALATION_REASON_CODES)}},
+                             ["reason", "reason_code"]))
         return specs
 
     def _dispatch(self, name: str, args: dict):
@@ -118,12 +138,17 @@ class ProductionAgent:
             result = domain.propose_reschedule(self.mcp, ref)
             for p in result.get("proposals", []):
                 self._proposals[p["work_order_id"]] = p
+                if not p.get("writable_by_seat") and p["number"] == (result.get("work_order") or {}).get("number"):
+                    self.needs_person.append(f"{p['number']}: {p.get('why_not_writable')}")
             return result
         if name == "seat_entities":
             return {"entities": domain.seat_entities(self.mcp)}
         if name == "seat_capability":
             return domain.seat_capability(self.mcp, args["tool"])
         if name == "apply_reschedule" and self.apply_mode:
+            if self.conflicts:
+                return {"outcome": "refused", "detail": f"not retrying: {', '.join(self.conflicts)} changed underneath this run; "
+                        "state must be re-planned by a person"}
             p = self._proposals.get(args["work_order_id"])
             if not p:
                 return {"outcome": "refused", "detail": "no proposal for that id in this run; call propose_reschedule first"}
@@ -131,10 +156,30 @@ class ProductionAgent:
             self.trace({"type": "approval", "work_order": p["number"], "approved": approved})
             if not approved:
                 return {"outcome": "not_approved", "number": p["number"]}
-            return domain.apply_proposal(self.mcp, p, self.allowed_write_ids)
+            result = domain.apply_proposal(self.mcp, p, self.allowed_write_ids)
+            if result.get("outcome") == "changed_underneath":
+                self.conflicts.append(p["number"])
+                self.needs_person.append(f"{p['number']}: changed by someone else during this run")
+            return result
+        if name == "escalate" and self.escalate_mode:
+            if len(self.escalations) >= self.max_escalations:
+                return {"raised": False, "reason_code": "limit", "detail": "already escalated in this run"}
+            if self.session_id is None:
+                self.session_id = domain.open_agent_session(self.mcp, self.session_title)
+            ref_text = f"[{args['work_order']}] " if args.get("work_order") else ""
+            result = domain.raise_escalation(self.mcp, self.session_id, ref_text + args["reason"],
+                                             args.get("reason_code", "policy_refusal"))
+            self.escalations.append(result)
+            return result
         if name == "record_finding":
             if self.finding is not None:
                 return {"error": "finding already recorded for this run"}
+            if self.escalate_mode and self.needs_person and not self.escalations:
+                # Guardrail, like record_finding itself: a handover a person must act on is not optional.
+                return {"error": "escalation required before recording the finding",
+                        "needs_person": self.needs_person,
+                        "instruction": "call escalate once (work order, records checked, what is missing, action "
+                                       "requested), then call record_finding with its result in escalations"}
             self.finding = args
             self.finding_record = domain.record_finding(self.mcp, self.run_id, args)
             return self.finding_record
@@ -180,6 +225,7 @@ class ProductionAgent:
                                  "content": json.dumps(result, default=str)[:60000]})
         outcome = {"run_id": self.run_id, "stop_reason": stop_reason, "final_answer": final,
                    "finding": self.finding, "finding_record": self.finding_record,
+                   "escalations": self.escalations, "agent_session_id": self.session_id, "conflicts": self.conflicts,
                    "seconds": round(time.time() - started, 1)}
         self.trace({"type": "end", **outcome})
         return outcome

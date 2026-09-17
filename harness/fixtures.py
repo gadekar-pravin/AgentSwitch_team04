@@ -67,4 +67,21 @@ def late_draft_chain(mcp: McpClient) -> dict:
     return out
 
 
+CONCURRENT_EDIT_NOTE = " | concurrent edit simulated by team04 harness"
+
+
+def concurrent_edit(mcp: McpClient, work_order_id: str) -> dict:
+    """Stand in for another team: move a fixture order's dates after the agent proposed, before it writes."""
+    today = config.today()
+    start, end = today + dt.timedelta(days=40), today + dt.timedelta(days=45)
+    row = mcp.call("WorkOrder.get", {"id": work_order_id})
+    base_notes = (row.get("notes") or "").split(CONCURRENT_EDIT_NOTE)[0]
+    mcp.call("WorkOrder.update", {"id": work_order_id, "planned_start_date": start.isoformat(),
+                                  "planned_end_date": end.isoformat(), "notes": base_notes + CONCURRENT_EDIT_NOTE})
+    after = mcp.call("WorkOrder.get", {"id": work_order_id})
+    return {"id": work_order_id, "number": after["number"], "planned_start_date": (after.get("planned_start_date") or "")[:10],
+            "planned_end_date": (after.get("planned_end_date") or "")[:10], "updated_at": after.get("updated_at"),
+            "snapshot_before_edit": row.get("updated_at")}
+
+
 FIXTURES = {"late_draft_chain": late_draft_chain}

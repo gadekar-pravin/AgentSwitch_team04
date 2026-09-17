@@ -13,6 +13,7 @@ def main():
     ap.add_argument("request")
     ap.add_argument("--instance", default="suryodaya", choices=sorted(config.INSTANCES))
     ap.add_argument("--apply", action="store_true", help="allow writes, each approved at the prompt")
+    ap.add_argument("--escalate", action="store_true", help="allow the agent to raise one escalation to a person")
     args = ap.parse_args()
 
     run_dir = config.ROOT / "runs" / "adhoc" / f"{dt.datetime.now():%Y%m%d-%H%M%S}-{args.instance}"
@@ -27,7 +28,8 @@ def main():
         print(f"\nProposed: {p['number']} {p['current_start']}..{p['current_end']} -> {p['new_start']}..{p['new_end']} ({p['reason']})")
         return input("Write this change? [y/N] ").strip().lower() == "y"
 
-    agent = ProductionAgent(McpClient(Session(args.instance)), apply_mode=args.apply, approve=approve, trace=trace)
+    agent = ProductionAgent(McpClient(Session(args.instance)), apply_mode=args.apply, escalate_mode=args.escalate,
+                            approve=approve, trace=trace)
     out = agent.run(args.request)
     (run_dir / "result.json").write_text(json.dumps(out, indent=2, default=str), encoding="utf-8")
     print(out["final_answer"] or f"(no final answer: {out['stop_reason']})")

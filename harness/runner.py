@@ -18,11 +18,11 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 
-from prod_agent import config
+from prod_agent import config, domain
 from prod_agent.agent import ProductionAgent
 from prod_agent.mcp_client import McpClient, RestClient, Session
 
-from .fixtures import FIXTURES
+from .fixtures import FIXTURES, concurrent_edit
 from .verify import Verdict, VerifyContext, normalise
 
 TASK_DIR = Path(__file__).parent / "tasks"
@@ -102,10 +102,10 @@ def run_one(task: dict, instance: str, root: Path) -> dict:
     run_dir.mkdir(parents=True, exist_ok=True)
     _write(run_dir / "task.json", task)
 
-    session = Session(instance)
-    mcp = McpClient(session)
-    fixture, context, error = None, None, None
+    fixture, context, error, mcp = None, None, None, None
     try:
+        session = Session(instance)
+        mcp = McpClient(session)
         if task.get("fixture"):
             fixture = FIXTURES[task["fixture"]](mcp)
         _write(run_dir / "fixture.json", fixture)
@@ -120,11 +120,24 @@ def run_one(task: dict, instance: str, root: Path) -> dict:
             os.fsync(trace_file.fileno())
 
         write_ids = set((fixture or {}).get("write_ids", []))
+        interference: list[dict] = []
+
+        def approve(p):
+            if p["work_order_id"] not in write_ids:  # harness approves fixture rows only
+                return False
+            already_edited = any(i["id"] == p["work_order_id"] for i in interference)
+            if task.get("interference") == "edit_dates_before_apply" and not already_edited:
+                edit = concurrent_edit(McpClient(Session(instance)), p["work_order_id"])
+                interference.append(edit)
+                _write(run_dir / "interference.json", interference)  # on disk before the agent's write attempt
+                trace({"type": "interference", **edit})
+            return True
+
         prompt = task["prompt"].format(**{f"{role}_number": v["number"] for role, v in (fixture or {}).items()
                                           if isinstance(v, dict) and "number" in v})
         agent = ProductionAgent(
-            mcp, apply_mode=task.get("mode") == "apply", allowed_write_ids=write_ids,
-            approve=lambda p: p["work_order_id"] in write_ids,  # harness approves fixture rows only
+            mcp, apply_mode=task.get("mode") == "apply", allowed_write_ids=write_ids, approve=approve,
+            escalate_mode=bool(task.get("escalate")), session_title=f"{config.HARNESS_MARKER} task {task['id']}",
             trace=trace, max_steps=task.get("max_steps", 20))
         result = agent.run(prompt)
         trace_file.close()
@@ -150,7 +163,28 @@ def run_one(task: dict, instance: str, root: Path) -> dict:
               "sample": bool(task.get("sample")), "run_id": result.get("run_id"),
               "seconds": result.get("seconds")}
     _write(run_dir / "verdict.json", record)
+    if mcp is not None and result.get("escalations"):
+        _write(run_dir / "cleanup.json", cleanup_escalations(mcp, result))
     return record
+
+
+def cleanup_escalations(mcp: McpClient, result: dict) -> dict:
+    """After scoring, withdraw escalations the harness caused so no person is left chasing a test."""
+    done = {"withdrawn": [], "session_closed": None, "errors": []}
+    for esc in result.get("escalations") or []:
+        if esc.get("raised") and esc.get("escalation_id"):
+            try:
+                domain.withdraw_escalation(mcp, esc["escalation_id"], "team04 harness test run: withdrawn after scoring")
+                done["withdrawn"].append(esc.get("number"))
+            except Exception as e:  # cleanup must never change a verdict
+                done["errors"].append(f"{esc.get('number')}: {e}")
+    if result.get("agent_session_id"):
+        try:
+            mcp.call("AgentSession.close.active.closed", {"id": result["agent_session_id"]})
+            done["session_closed"] = result["agent_session_id"]
+        except Exception as e:
+            done["errors"].append(f"session: {e}")
+    return done
 
 
 def main():

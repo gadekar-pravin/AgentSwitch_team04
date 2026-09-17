@@ -41,11 +41,18 @@ CONNECT_RETRIES = 3
 CONNECT_BACKOFF_SECONDS = 2.0
 
 
-def _http(url, body=None, token=None, method=None, timeout=120, retries=CONNECT_RETRIES):
+GATEWAY_ERRORS = {502, 503, 504}
+
+
+def _http(url, body=None, token=None, method=None, timeout=120, retries=CONNECT_RETRIES, read_only=None):
+    """read_only: retry gateway errors too. Defaults to True for bodiless requests (GET). A gateway error on a
+    write may come after the server applied it, so writes are never retried on 502/503/504."""
     headers = {"Content-Type": "application/json"}
     if token:
         headers["Authorization"] = f"Bearer {token}"
     data = json.dumps(body).encode() if body is not None else None
+    if read_only is None:
+        read_only = data is None
     for attempt in range(retries + 1):
         req = urllib.request.Request(url, data=data, headers=headers, method=method)
         try:
@@ -54,6 +61,9 @@ def _http(url, body=None, token=None, method=None, timeout=120, retries=CONNECT_
         except urllib.error.HTTPError as e:
             if e.code == 401:
                 raise AuthExpired(url) from e
+            if read_only and e.code in GATEWAY_ERRORS and attempt < retries:
+                time.sleep(CONNECT_BACKOFF_SECONDS * (attempt + 1))
+                continue
             try:
                 payload = json.loads(e.read() or b"null")
             except ValueError:
@@ -106,10 +116,24 @@ class McpClient:
         self._tools = None
         self.session.with_reauth(self._initialize)
 
+    READ_ONLY_ENDPOINTS = {
+        "endpoint.manufacturing.finite_schedule", "endpoint.manufacturing.check_stock_availability",
+        "endpoint.manufacturing.genealogy", "endpoint.agent_governance.escalations",
+        "endpoint.agent_governance.escalations.assignees",
+    }
+
+    @classmethod
+    def _is_read_only(cls, method, params) -> bool:
+        if method in ("initialize", "tools/list"):
+            return True
+        name = (params or {}).get("name", "") if method == "tools/call" else ""
+        return name.endswith((".list", ".get")) or name in cls.READ_ONLY_ENDPOINTS
+
     def _rpc(self, method, params=None):
         self._id += 1
         body = {"jsonrpc": "2.0", "id": self._id, "method": method, "params": params or {}}
-        status, payload = _http(f"{self.session.base}/api/mcp", body, self.session.token)
+        status, payload = _http(f"{self.session.base}/api/mcp", body, self.session.token,
+                                read_only=self._is_read_only(method, params))
         if status != 200 or payload is None:
             raise McpError(status, f"HTTP {status}", payload)
         if "error" in payload:

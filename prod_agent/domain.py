@@ -248,13 +248,16 @@ def downstream_impact(mcp: McpClient, ref: str, max_depth: int = 3) -> dict:
             if w["id"] in visited or parent.get("item_id") not in bom_inputs.get(w.get("bom_id"), set()):
                 continue
             visited.add(w["id"])
-            blocked.append({**_wo_summary(w), "depth": depth + 1, "consumes_output_of": parent.get("number")})
+            # A BOM match shows possible demand, not a confirmed supply link: stock or another order may cover it.
+            blocked.append({**_wo_summary(w), "depth": depth + 1, "consumes_output_of": parent.get("number"),
+                            "link": "bom_material_match", "confidence": "potential"})
             frontier.append((w, depth + 1))
 
     so_ids = {}
     for w in [_wo_summary(wo)] + blocked:
         if w.get("sales_order_id"):
             so_ids.setdefault(w["sales_order_id"], w["number"])
+    target_number = wo.get("number")
 
     chain = [_wo_summary(wo)] + blocked
     unlinked_mto = [w["number"] for w in chain if w.get("production_strategy") == "make_to_order" and not w.get("sales_order_id")]
@@ -274,6 +277,8 @@ def downstream_impact(mcp: McpClient, ref: str, max_depth: int = 3) -> dict:
                 "id": so_id, "number": so.get("number"), "customer": so.get("_party_id_display") or so.get("party_id"),
                 "delivery_date": (so.get("delivery_date") or "")[:10] or None, "grand_total": so.get("grand_total"),
                 "delivered_status": so.get("delivered_status"), "status": so.get("status"), "via_work_order": via,
+                # Linked on the late order itself = recorded exposure; linked on a potential consumer = potential.
+                "link": "sales_order_id", "confidence": "linked" if via == target_number else "potential",
             })
 
     if not so_visible:
@@ -290,9 +295,10 @@ def downstream_impact(mcp: McpClient, ref: str, max_depth: int = 3) -> dict:
         "work_order": _wo_summary(wo),
         "customer_impact": customer_impact,
         "make_to_order_without_sales_order": unlinked_mto,
-        "blocked_work_orders": blocked,
+        "potentially_blocked_work_orders": blocked,
         "blocked_sales_orders": sales_orders,
-        "method": "reverse walk of BOM materials over open work orders; WorkOrder has no parent/child link",
+        "method": "reverse walk of BOM materials over open work orders; WorkOrder has no parent/child link, "
+                  "so these are potential consumers, not confirmed blocks",
         "not_visible_to_this_seat": not_visible,
     }
 
@@ -345,7 +351,7 @@ def propose_reschedule(mcp: McpClient, ref: str) -> dict:
             proposals.append(proposal(target, new_start, new_end, "earliest start after known blockers; finish from finite schedule"))
 
     upstream_end = {target["number"]: target_end}
-    for w in down["blocked_work_orders"]:
+    for w in down["potentially_blocked_work_orders"]:
         parent_end = upstream_end.get(w["consumes_output_of"])
         if w["status"] in ("in_progress", "stopped"):
             upstream_end[w["number"]] = None
@@ -364,7 +370,7 @@ def propose_reschedule(mcp: McpClient, ref: str) -> dict:
         proposals.append(proposal(w, new_start, new_end, f"must start after {w['consumes_output_of']} finishes"))
 
     return {"found": True, "work_order": target, "today": _iso(today), "proposals": proposals,
-            "downstream_considered": [b["number"] for b in down["blocked_work_orders"]]}
+            "downstream_considered": [b["number"] for b in down["potentially_blocked_work_orders"]]}
 
 
 def apply_proposal(mcp: McpClient, p: dict, allowed_ids: set[str] | None = None) -> dict:
@@ -387,6 +393,47 @@ def apply_proposal(mcp: McpClient, p: dict, allowed_ids: set[str] | None = None)
     ok = (after.get("planned_start_date") or "")[:10] == p["new_start"] and (after.get("planned_end_date") or "")[:10] == p["new_end"]
     return {**out, "outcome": "applied" if ok else "write_not_persisted",
             "planned_start_date": after.get("planned_start_date"), "planned_end_date": after.get("planned_end_date")}
+
+
+# --------------------------------------------------------------------------- escalation
+
+ESCALATION_REASON_CODES = ("policy_refusal", "unresolved_after_retries", "other")
+
+
+def escalation_assignees(mcp: McpClient) -> list[dict]:
+    res = mcp.call("endpoint.agent_governance.escalations.assignees", {})
+    return (res.get("result", res) or {}).get("options", [])
+
+
+def open_agent_session(mcp: McpClient, title: str) -> str:
+    return mcp.call("AgentSession.create", {"title": title[:120], "channel": "api"})["id"]
+
+
+def raise_escalation(mcp: McpClient, session_id: str, reason: str, reason_code: str = "policy_refusal",
+                     sla_minutes: int = 240) -> dict:
+    """Hand work to a person. The platform names who; if nobody is assignable, say so instead of pretending."""
+    if reason_code not in ESCALATION_REASON_CODES:
+        reason_code = "other"
+    assignees = escalation_assignees(mcp)
+    if not assignees:
+        return {"raised": False, "reason_code": "no_assignee",
+                "detail": "no escalation assignee is configured for this company; a person must be contacted directly"}
+    assignee = assignees[0]
+    res = mcp.call("endpoint.agent_governance.escalations.raise", {
+        "session_id": session_id, "assignee_party_id": assignee["id"], "reason": reason,
+        "reason_code": reason_code, "sla_minutes": sla_minutes})
+    res = res.get("result", res)
+    if not res.get("ok"):  # the endpoint reports refusals inside a success envelope
+        return {"raised": False, "reason_code": res.get("reason_code"), "detail": "the platform refused the escalation"}
+    esc = res["escalation"]
+    return {"raised": True, "escalation_id": esc["id"], "number": esc.get("number"), "status": esc.get("status"),
+            "assignee": esc.get("assignee_display"), "due_at": esc.get("due_at")}
+
+
+def withdraw_escalation(mcp: McpClient, escalation_id: str, note: str) -> dict:
+    res = mcp.call("endpoint.agent_governance.escalations.update", {
+        "escalation_id": escalation_id, "action": "withdraw", "note": note, "outcome": "withdrawn"})
+    return res.get("result", res)
 
 
 # --------------------------------------------------------------------------- findings

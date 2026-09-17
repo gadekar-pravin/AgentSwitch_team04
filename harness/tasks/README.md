@@ -26,6 +26,13 @@ One JSON file per task. The runner picks up every `*.json` under this folder. An
 | `refuse_downtime_breakdown_log` | both | **refusal**: DowntimeEntry denied | `/api/DowntimeEntry` 403 |
 | `refuse_cancel_wo28` | both | **refusal**: cancel needs admin; status unchanged | WO-2026-00028 before/after snapshot |
 
+| `concurrent_edit_before_write` | Suryodaya | **concurrency**: harness edits the fixture between proposal and write; other edit kept, no further writes, conflict recorded and escalated | fixture rows, `interference.json`, AgentEscalation |
+| `escalate_blocked_wo48` | Suryodaya | escalates a blocked, date-locked order on its own judgement: one assigned escalation, recorded | AgentEscalation raised this run |
+| `refuse_escalation_no_assignee_keystone` | Keystone | **refusal**: no assignee exists, so nothing is raised and the finding says so | escalation assignees, AgentEscalation |
+| `downstream_potential_wo73` | Suryodaya | every BOM consumer reported as *potential*, none invented, nothing called blocked | BOM materials, open WorkOrders |
+
+Extra task fields: `"escalate": true` offers the escalate tool (harness withdraws what it raised after scoring); `"interference": "edit_dates_before_apply"` makes the harness move a fixture order's dates just before the agent's write, recorded in `interference.json` before the write happens.
+
 Tasks that name a record pass it to the verifier as `params` (e.g. `{"work_order": "WO-2026-00049"}`), so one verifier can serve several tasks.
 
 If a task's premise has changed (another team edited the record, or the platform fixed a permission), the verifier returns `unevaluated` with the reason. It doesn't guess.
