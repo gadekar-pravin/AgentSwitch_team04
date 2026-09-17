@@ -15,6 +15,10 @@ All reports were filed through `POST /api/bug-report` as team04 (Production seat
 | B6 | Keystone | 4c26c220-0513-4423-8b5c-76eb28c5bbc6 | Cost Analysis page shows ₹ for a US company whose currency is USD | S30 | Medium | Fixed, next release |
 | B9 | Suryodaya (also Keystone) | a77321bc-5a2d-4a3d-8106-3f05a7146afc | `check_stock_availability` returns "not found" inside a success response instead of an error | S29 | Medium | Fixed, next release |
 
-Distinct defects: about 7 (B1a, B2a and B5a are follow-ups or duplicates).
+| B10 | Suryodaya (also Keystone) | af8c5d99-1408-48bb-b3f2-e1274d1d6a18 | Production seat can create, update and delete email `TrustedSender` rows (another app's security control) | — | High | Filed 17 Sep, after cutoff |
+| B11 | Suryodaya (also Keystone) | 64772b8a-4d5e-4cbb-b245-a45b7c995f21 | Every `.delete` tool returns `{"deleted": true}` for an id that does not exist | — | Medium | Filed 17 Sep, after cutoff |
+| B12 | Suryodaya (also Keystone) | 4a41704c-7308-4611-bf8b-da08a2446fee | `finite_schedule` `recorded_downtime` cites downtime linked to neither the order nor the cause's workstation (follow-up to M4) | — | Medium | Filed 17 Sep, after cutoff |
 
-Status from the class Bug Board, 17 Sep: all 10 accepted; 8 live in Release 1 (17 Sep 2026, 18:40 IST), 2 fixed and shipping in the next release. Re-tested live on both instances the same day.
+Distinct defects: about 10 (B1a, B2a and B5a are follow-ups or duplicates).
+
+Status from the class Bug Board, 17 Sep: the first 10 reports were all accepted; 8 live in Release 1 (17 Sep 2026, 18:40 IST), 2 fixed and shipping in the next release. Re-tested live on both instances the same day. B10-B12 were filed after the 14:35 cutoff, so they are queued for the next release and carry no board id yet.
