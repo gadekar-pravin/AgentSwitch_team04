@@ -3,7 +3,7 @@ import json
 import time
 import traceback
 import uuid
-from typing import Callable
+from collections.abc import Callable
 
 from . import config, domain
 from .mcp_client import McpClient, McpError

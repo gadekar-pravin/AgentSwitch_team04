@@ -17,6 +17,8 @@ select = [
 ignore = [
     "E501",   # line length: existing code runs to ~140 chars
     "B008",   # function call in default arg: used intentionally here
+    "UP042",  # str+Enum -> StrEnum: an unsafe fix on graded code. Verdict is
+              # serialised via explicit .value, so the current form is correct.
 ]
 
 [format]
