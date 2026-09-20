@@ -41,6 +41,15 @@ Python 3.11. Plain `pip`, no lockfile. Required in `.env`: `TEAM04_PASSWORD_SURY
 `TEAM04_PASSWORD_KEYSTONE`, `OPENAI_API_KEY`. Optional: `OPENAI_MODEL` (default
 `gpt-4.1`), `AGENT_TODAY`.
 
+`LLM_PROVIDER` picks where the loop sends its completions. Unset or `openai` is the
+default and reads `OPENAI_API_KEY`/`OPENAI_MODEL` as before. `openrouter` routes through
+`https://openrouter.ai/api/v1` and requires both `OPENROUTER_API_KEY` and
+`OPENROUTER_MODEL` — there is no cross-provider fallback, and no default slug, because
+`gpt-4.1` is not a valid OpenRouter id (they are `vendor/model`). A model reached this way
+must support tool calling *and* a forced `tool_choice`; without the latter the loop cannot
+make it record a finding before the step budget ends. Each run's `start` trace event
+records the resolved provider.
+
 **`.env` overrides the process environment**, not the other way round — an exported shell
 variable is silently beaten by a non-empty `.env` line (`prod_agent/config.py:20`).
 
@@ -82,7 +91,10 @@ These fail the submission check, not just review:
   Some endpoints report refusals inside a success envelope.
 - Reads are retried on 502/503/504; **writes are never retried**.
 - Once any write reports `changed_underneath`, every further write in that run is refused.
-- `temperature=0` is only sent for `gpt-4*`/`gpt-3*` models; reasoning models reject it.
+- `temperature=0` is only sent for `gpt-4*`/`gpt-3*` models, matched after any `vendor/`
+  namespace is stripped so `openai/gpt-4.1` still counts; reasoning models reject it. This
+  is an allow-list on purpose: a miss only costs determinism, whereas sending the parameter
+  to a model that rejects it raises from an LLM call that has no `try` around it.
 
 ## Code style
 

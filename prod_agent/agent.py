@@ -77,7 +77,15 @@ class ProductionAgent:
                  max_steps: int = 20, llm=None, escalate_mode: bool = False, session_title: str | None = None,
                  max_escalations: int = 1):
         self.mcp = mcp
-        self.model = model or config.env("OPENAI_MODEL", "gpt-4.1")
+        self.provider = (config.env("LLM_PROVIDER", "openai") or "openai").strip().lower()
+        if self.provider == "openai":
+            self.model = model or config.env("OPENAI_MODEL", "gpt-4.1")
+        elif self.provider == "openrouter":
+            self.model = model or config.env("OPENROUTER_MODEL")
+            if not self.model:
+                raise RuntimeError("Set OPENROUTER_MODEL in .env")
+        else:
+            raise RuntimeError(f"Unknown LLM_PROVIDER {self.provider!r}; accepted values are openai and openrouter")
         self.run_id = run_id or uuid.uuid4().hex[:12]
         self.apply_mode = apply_mode
         self.approve = approve or (lambda proposal: False)
@@ -98,7 +106,13 @@ class ProductionAgent:
         if llm is None:
             from openai import OpenAI
             # The SDK backs off on 429/5xx; the default 2 retries is too few for a 30k tokens-per-minute key.
-            llm = OpenAI(api_key=config.env("OPENAI_API_KEY"), max_retries=8)
+            if self.provider == "openai":
+                llm = OpenAI(api_key=config.env("OPENAI_API_KEY"), max_retries=8)
+            else:
+                api_key = config.env("OPENROUTER_API_KEY")
+                if not api_key:
+                    raise RuntimeError("Set OPENROUTER_API_KEY in .env")
+                llm = OpenAI(api_key=api_key, base_url="https://openrouter.ai/api/v1", max_retries=8)
         self.llm = llm
 
     # ------------------------------------------------------------------ tools
@@ -235,11 +249,12 @@ class ProductionAgent:
         started = time.time()
         messages = [{"role": "system", "content": SYSTEM_PROMPT}, {"role": "user", "content": request}]
         self.trace({"type": "start", "run_id": self.run_id, "instance": self.mcp.session.instance,
-                    "model": self.model, "apply_mode": self.apply_mode, "request": request})
+                    "provider": self.provider, "model": self.model, "apply_mode": self.apply_mode, "request": request})
         final, stop_reason = None, "max_steps"
         for step in range(self.max_steps):
-            # Reasoning models (gpt-5.x, o-series) reject a non-default temperature.
-            sampling = {"temperature": 0} if self.model.startswith(("gpt-4", "gpt-3")) else {}
+            # Strip a provider namespace so OpenRouter's OpenAI model ids retain deterministic sampling.
+            sampling_model = self.model.rpartition("/")[2]
+            sampling = {"temperature": 0} if sampling_model.startswith(("gpt-4", "gpt-3")) else {}
             choice = self._wrap_up_choice(step)
             if choice is not None:
                 sampling["tool_choice"] = choice
