@@ -22,14 +22,18 @@ Reading code, offline tests, and inspecting `runs/` output need no confirmation.
 pip install -r requirements.txt
 cp .env.example .env    # both passwords + OPENAI_API_KEY; .env is git-ignored
 
-python -m pytest tests                              # graded tests
+python -m pytest tests                              # graded tests — 13 of the 40 hit live tenants
+AGENT_OFFLINE=1 python -m pytest tests              # the 27 that need no network
 AGENT_TODAY=2026-09-16 python -m pytest tests_ai -v # pin the date or results drift
 python scripts/verify_submission.py                 # full pre-submission checklist
 python scripts/verify_submission.py --offline       # skip network checks
 ```
 
 `verify_submission.py` shells out to `pytest tests -q` and exits non-zero on any failed
-check. Run it before considering work done.
+check. Run it before considering work done. Under `--offline` the graded suite is reported as a
+skip with counts rather than a `PASS`, because it no longer verifies the 13 live tests; the run
+still fails on a genuine test failure, and it fails if the suite reports **no** skips at all,
+since that means the gate never engaged and the tests really did run live.
 
 Agent and harness invocations are documented in each module's docstring
 (`prod_agent/__main__.py`, `harness/runner.py`) — this repo uses docstrings instead of a
@@ -52,6 +56,15 @@ records the resolved provider.
 
 **`.env` overrides the process environment**, not the other way round — an exported shell
 variable is silently beaten by a non-empty `.env` line (`prod_agent/config.py:20`).
+
+`AGENT_OFFLINE` is the one exception, and it is **shell-only**: putting it in `.env` does nothing.
+The root `conftest.py` reads it straight from `os.environ` during collection, which happens before
+anything calls `load_dotenv`, precisely so a stray `.env` line cannot silently switch the gate on
+or off. Set to exactly `1`, it skips every test that depends on a live-tenant fixture — `surya`,
+`suryodaya` or `keystone` — before the fixture can log in. Any other value, including empty, means
+"not offline". The gate only applies when pytest actually loads the root `conftest.py`, so
+`cd tests && pytest .`, an absolute tests path from an unrelated directory, and `--noconftest` all
+bypass it: invoke pytest from the repository root.
 
 ## Hard constraints (enforced by scripts/verify_submission.py)
 
