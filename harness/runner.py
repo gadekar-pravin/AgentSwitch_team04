@@ -28,6 +28,13 @@ from .verify import Verdict, VerifyContext, normalise
 TASK_DIR = Path(__file__).parent / "tasks"
 
 
+def _new_run_root(base: Path) -> Path:
+    # Run output is grading evidence, and reusing a collision silently produces merged artifacts that still parse.
+    root = base / dt.datetime.now().strftime("%Y%m%d-%H%M%S-%f")
+    root.mkdir(parents=True)
+    return root
+
+
 def _write(path: Path, data) -> None:
     with path.open("w", encoding="utf-8") as f:
         json.dump(data, f, indent=2, default=str)
@@ -99,7 +106,7 @@ def persist_then_verify(run_dir: Path, result: dict, verify, *, catch: bool = Tr
 
 def run_one(task: dict, instance: str, root: Path) -> dict:
     run_dir = root / instance / task["id"]
-    run_dir.mkdir(parents=True, exist_ok=True)
+    run_dir.mkdir(parents=True, exist_ok=False)
     _write(run_dir / "task.json", task)
 
     fixture, context, error, mcp = None, None, None, None
@@ -112,7 +119,7 @@ def run_one(task: dict, instance: str, root: Path) -> dict:
         context = capture_context(RestClient(session), task)
         _write(run_dir / "context.json", context)
 
-        trace_file = (run_dir / "trace.jsonl").open("a", encoding="utf-8")
+        trace_file = (run_dir / "trace.jsonl").open("x", encoding="utf-8")
 
         def trace(event):
             trace_file.write(json.dumps(event, default=str) + "\n")
@@ -195,7 +202,7 @@ def main():
     args = ap.parse_args()
 
     tasks = [t for t in load_tasks(args.include_samples) if not args.task or t["id"] in args.task]
-    root = config.ROOT / "runs" / dt.datetime.now().strftime("%Y%m%d-%H%M%S")
+    root = _new_run_root(config.ROOT / "runs")
     records = []
     for task in tasks:
         instances = task.get("instances", sorted(config.INSTANCES))
