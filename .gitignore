@@ -9,6 +9,9 @@ runs/
 # Unfiled security findings: keep out of the public repo until reported
 notes/bug_candidates.md
 
+# Local working drafts: not part of the submission
+drafts/
+
 # Python
 __pycache__/
 *.py[cod]
