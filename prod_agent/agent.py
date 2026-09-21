@@ -251,6 +251,7 @@ class ProductionAgent:
         self.trace({"type": "start", "run_id": self.run_id, "instance": self.mcp.session.instance,
                     "provider": self.provider, "model": self.model, "apply_mode": self.apply_mode, "request": request})
         final, stop_reason = None, "max_steps"
+        llm_error = None
         for step in range(self.max_steps):
             # Strip a provider namespace so OpenRouter's OpenAI model ids retain deterministic sampling.
             sampling_model = self.model.rpartition("/")[2]
@@ -259,15 +260,25 @@ class ProductionAgent:
             if choice is not None:
                 sampling["tool_choice"] = choice
                 self.trace({"type": "wrap_up", "step": step, "tool_choice": choice})
-            resp = self.llm.chat.completions.create(model=self.model, messages=messages,
-                                                    tools=self.tool_specs(), **sampling)
-            msg = resp.choices[0].message
-            usage = getattr(resp, "usage", None)
-            self.trace({"type": "llm", "step": step, "content": msg.content,
-                        "tool_calls": [{"id": c.id, "name": c.function.name, "arguments": c.function.arguments}
-                                       for c in (msg.tool_calls or [])],
-                        "usage": usage.model_dump() if usage else None})
-            messages.append(msg.model_dump(exclude_none=True))
+            tools = self.tool_specs()
+            try:
+                resp = self.llm.chat.completions.create(model=self.model, messages=messages,
+                                                        tools=tools, **sampling)
+                msg = resp.choices[0].message
+                usage = getattr(resp, "usage", None)
+                llm_event = {"type": "llm", "step": step, "content": msg.content,
+                             "tool_calls": [{"id": c.id, "name": c.function.name,
+                                             "arguments": c.function.arguments}
+                                            for c in (msg.tool_calls or [])],
+                             "usage": usage.model_dump() if usage else None}
+                dumped_message = msg.model_dump(exclude_none=True)
+            except Exception:
+                # Verifiers grade the database, so a recorded finding must still be scored after an LLM failure.
+                llm_error = traceback.format_exc()
+                stop_reason = "llm_error"
+                break
+            self.trace(llm_event)
+            messages.append(dumped_message)
             if not msg.tool_calls:
                 final, stop_reason = msg.content, "final_answer"
                 break
@@ -292,5 +303,8 @@ class ProductionAgent:
                    "finding": self.finding, "finding_record": self.finding_record,
                    "escalations": self.escalations, "agent_session_id": self.session_id, "conflicts": self.conflicts,
                    "seconds": round(time.time() - started, 1)}
-        self.trace({"type": "end", **outcome})
+        end_event = {"type": "end", **outcome}
+        if llm_error is not None:
+            end_event["error"] = llm_error
+        self.trace(end_event)
         return outcome
