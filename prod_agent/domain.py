@@ -772,3 +772,18 @@ def record_finding(mcp: McpClient, run_id: str, finding: dict) -> dict:
         "category": "fact", "source": "system", "importance": 0.5, "is_active": True,
     })
     return {"agent_memory_id": row.get("id"), "run_id": run_id}
+
+# --- Stopped/finished orders are never late ---------------------------------
+NOT_LATE_STATUSES = {"stopped", "cancelled", "canceled", "completed", "closed"}
+
+_diagnose_original = diagnose
+
+
+def diagnose(mcp, ref, *args, **kwargs):
+    result = _diagnose_original(mcp, ref, *args, **kwargs)
+    if isinstance(result, dict):
+        wo = result.get("work_order") or {}
+        status = str(wo.get("status") or "").strip().lower()
+        if status in NOT_LATE_STATUSES:
+            result["is_late"] = False
+    return result
