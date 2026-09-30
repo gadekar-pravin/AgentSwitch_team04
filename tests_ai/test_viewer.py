@@ -234,6 +234,14 @@ def test_a_path_outside_the_run_layout_is_not_found(console):
     assert status == 404
 
 
+def test_task_list_carries_what_each_task_tests(console):
+    [task] = [t for t in json.loads(_call(console, "/api/tasks")[1]) if t["id"] == "refuse_x"]
+
+    # The page shows these before a live run starts; for past runs it reads them from task.json instead.
+    assert {"prompt", "checks"} <= task.keys()
+    assert task["instances"] == ["keystone", "suryodaya"]
+
+
 def test_a_foreign_host_header_is_refused(console):
     status, _ = _call(console, "/api/tasks", headers={"Host": "evil.test"})
     assert status == 403

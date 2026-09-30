@@ -5,76 +5,233 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>team04 run console</title>
 <style>
-:root { --bg: #fbfbfa; --fg: #1b1b1b; --muted: #6b6b6b; --line: #dcdcd8; --panel: #f2f2ef;
-        --ok: #1a7f4b; --bad: #b3261e; --tool: #8a5a00; --llm: #3e63c4; }
-@media (prefers-color-scheme: dark) {
-  :root { --bg: #151515; --fg: #ececec; --muted: #9b9b9b; --line: #333; --panel: #1e1e1e;
-          --ok: #5cc28b; --bad: #f28b82; --tool: #e0b04a; --llm: #8fa8ff; }
+:root {
+  --bg: #edeff2; --card: #ffffff; --soft: #f5f6f8; --ink: #1a212b; --muted: #5a6573; --line: #d6dbe1;
+  --accent: #2459c7; --accent-tint: #e7eefb;
+  --ok: #1d7a4e; --ok-tint: #e2f2e9; --bad: #b42331; --bad-tint: #fbe7e9; --warn: #8c5a00; --warn-tint: #fbf0d9;
+  --tag: #f6efdc; --tag-ink: #3a2f12; --tag-line: #d8c89f;
+  --shadow: 0 1px 2px rgb(16 24 40 / .06), 0 1px 3px rgb(16 24 40 / .08);
+  --display: "Avenir Next Condensed", "Roboto Condensed", "Arial Narrow", sans-serif-condensed, sans-serif;
+  --body: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  color-scheme: light dark;
 }
-body { margin: 0; background: var(--bg); color: var(--fg); font: 15px/1.45 system-ui, sans-serif; }
-main { display: grid; grid-template-columns: 340px 1fr; gap: 16px; padding: 16px; max-width: 1400px; margin: auto; }
-section { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 12px; margin-bottom: 16px; }
-h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); margin: 0 0 8px; }
-select, input, button { font: inherit; width: 100%; margin: 4px 0; padding: 6px; box-sizing: border-box; }
-ul { list-style: none; padding-left: 0; } ul ul { padding-left: 12px; font-size: 13px; }
-ul ul li { cursor: pointer; }
-.muted { color: var(--muted); font-size: 13px; }
-.approve { color: var(--ok); } .revise, .unevaluated { color: var(--bad); }
-.ev { border-left: 3px solid var(--line); padding: 4px 8px; margin: 6px 0; white-space: pre-wrap;
-      word-break: break-word; font: 13px/1.4 ui-monospace, monospace; }
-.ev.llm { border-color: var(--llm); } .ev.tool { border-color: var(--tool); }
-.ev.end { border-color: var(--ok); } .ev.exception { border-color: var(--bad); }
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #11151b; --card: #19202a; --soft: #1f2630; --ink: #e6eaf0; --muted: #9aa4b2; --line: #2c3440;
+    --accent: #8fb0ff; --accent-tint: #1c2a45;
+    --ok: #6fd3a0; --ok-tint: #143020; --bad: #ff9aa4; --bad-tint: #3a171b; --warn: #f2c46b; --warn-tint: #392b10;
+    --tag: #29251a; --tag-ink: #f1e6c4; --tag-line: #4d4429; --shadow: none;
+  }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 16px/1.5 var(--body); }
+code, .mono { font-family: var(--mono); font-size: .86em; }
+h1, h2, h3 { margin: 0; }
+button, select, input { font: inherit; color: inherit; }
+:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+[hidden] { display: none !important; }
+
+#conn { position: sticky; top: 0; z-index: 5; margin: 0; padding: 10px 24px; background: var(--bad); color: #fff; font-weight: 600; }
+.top { display: flex; align-items: center; justify-content: space-between; gap: 16px; max-width: 1560px; margin: 0 auto;
+       padding: 18px 24px 0; }
+.brand { font: 600 22px/1 var(--display); letter-spacing: .02em; }
+.brand span { color: var(--muted); font-weight: 500; }
+.pill { display: inline-flex; align-items: center; gap: 8px; border: 1px solid var(--line); background: var(--card);
+        border-radius: 999px; padding: 6px 14px; font-size: 14px; cursor: pointer; }
+.dot { width: 9px; height: 9px; border-radius: 50%; background: var(--accent); flex: none; }
+.running .dot { animation: pulse 1.2s ease-in-out infinite; }
+@keyframes pulse { 50% { opacity: .35; } }
+
+main { display: grid; grid-template-columns: 340px minmax(0, 1fr); gap: 20px; max-width: 1560px; margin: 0 auto; padding: 18px 24px 40px; }
+.card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 20px; box-shadow: var(--shadow); }
+.rail { display: flex; flex-direction: column; gap: 20px; min-width: 0; }
+.rail h2, .card > h2 { font: 600 13px/1.2 var(--body); text-transform: uppercase; letter-spacing: .07em; color: var(--muted); margin-bottom: 12px; }
+.field { display: block; margin-bottom: 12px; font-size: 14px; color: var(--muted); }
+.field select, .field input, .history select { display: block; width: 100%; margin-top: 4px; height: 42px; padding: 0 10px;
+  border: 1px solid var(--line); border-radius: 8px; background: var(--soft); color: var(--ink); }
+.clamp { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.muted { color: var(--muted); } .small { font-size: 14px; }
+button.primary { width: 100%; height: 44px; border: 0; border-radius: 8px; background: var(--accent); color: #fff; font-weight: 600; cursor: pointer; }
+@media (prefers-color-scheme: dark) { button.primary { color: #0d1526; } }
+button.secondary { width: 100%; height: 40px; margin-top: 8px; border: 1px solid var(--accent); border-radius: 8px; background: none; color: var(--accent); cursor: pointer; }
 .error { color: var(--bad); white-space: pre-wrap; }
-details pre { white-space: pre-wrap; word-break: break-word; margin: 4px 0 0; }
-#conn { background: var(--bad); color: var(--bg); padding: 8px 16px; margin: 0; }
-@media (max-width: 800px) { main { grid-template-columns: 1fr; } }
+p.error:empty { display: none; }
+pre { margin: 6px 0 0; padding: 10px 12px; border-radius: 6px; background: var(--soft); font: 13px/1.45 var(--mono);
+      white-space: pre-wrap; word-break: break-word; max-height: 360px; overflow: auto; }
+
+.badges { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0 12px; }
+.chip { display: inline-flex; align-items: center; gap: 4px; border-radius: 999px; padding: 2px 10px; font-size: 13px;
+        background: var(--soft); border: 1px solid var(--line); white-space: nowrap; }
+.chip.mono { font-family: var(--mono); font-size: 12.5px; }
+.chip b { font-weight: 600; }
+.t-ok { color: var(--ok); background: var(--ok-tint); border-color: transparent; }
+.t-bad { color: var(--bad); background: var(--bad-tint); border-color: transparent; }
+.t-warn { color: var(--warn); background: var(--warn-tint); border-color: transparent; }
+.t-info { color: var(--accent); background: var(--accent-tint); border-color: transparent; }
+
+/* Past runs: one row per task, one cell per instance */
+.total { display: flex; align-items: baseline; justify-content: space-between; margin: 12px 0 6px; font-size: 14px; }
+.total b { font: 600 20px/1 var(--display); }
+.bar { height: 6px; border-radius: 3px; background: var(--bad-tint); overflow: hidden; margin-bottom: 12px; }
+.bar i { display: block; height: 100%; background: var(--ok); }
+.grid { display: grid; grid-template-columns: minmax(0, 1fr) repeat(var(--cols), 34px); gap: 4px 6px; align-items: center; font-size: 13px; }
+.grid .head { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .05em; text-align: center; }
+.grid .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cell { height: 26px; border-radius: 6px; border: 1px solid transparent; font-weight: 700; cursor: pointer; padding: 0; }
+.cell.approve { background: var(--ok-tint); color: var(--ok); } .cell.revise { background: var(--bad-tint); color: var(--bad); }
+.cell.unevaluated { background: var(--warn-tint); color: var(--warn); }
+.cell.none { background: none; border: 1px dashed var(--line); color: var(--muted); cursor: default; }
+.cell.na { background: none; color: var(--line); cursor: default; }
+.cell.selected { outline: 2px solid var(--accent); outline-offset: 1px; }
+.legend { margin-top: 10px; font-size: 12px; color: var(--muted); }
+
+/* Detail */
+.detail { display: flex; flex-direction: column; gap: 20px; min-width: 0; }
+.eyebrow { margin: 0 0 4px; font-size: 13px; color: var(--muted); letter-spacing: .03em; }
+.task-head h1 { font: 600 32px/1.1 var(--display); letter-spacing: .01em; }
+.tests { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 20px; margin-top: 4px; }
+.tests h3 { font-size: 13px; text-transform: uppercase; letter-spacing: .07em; color: var(--muted); margin-bottom: 4px; }
+.tests p { margin: 0; }
+blockquote { margin: 0; padding-left: 12px; border-left: 3px solid var(--line); color: var(--muted); }
+.empty { color: var(--muted); padding: 48px 20px; text-align: center; }
+
+.outcome { display: grid; grid-template-columns: 320px minmax(0, 1fr); gap: 20px; align-items: start; }
+
+/* The inspection tag: the one decorative element, because a verdict here is an inspection result */
+.tag { position: relative; background: var(--tag); color: var(--tag-ink); border: 1px solid var(--tag-line);
+       padding: 34px 22px 20px; box-shadow: var(--shadow);
+       clip-path: polygon(22px 0, calc(100% - 22px) 0, 100% 22px, 100% 100%, 0 100%, 0 22px); border-radius: 0 0 10px 10px; }
+.tag::before { content: ""; position: absolute; top: 12px; left: 50%; width: 14px; height: 14px; margin-left: -7px;
+               border-radius: 50%; background: var(--bg); border: 2px solid var(--tag-line); }
+.kicker { margin: 0; text-align: center; font: 600 12px/1 var(--body); text-transform: uppercase; letter-spacing: .18em; opacity: .75; }
+.stamp { display: block; width: fit-content; margin: 14px auto 10px; padding: 4px 14px; border: 3px double currentColor;
+         border-radius: 6px; font: 700 40px/1.05 var(--display); text-transform: uppercase; letter-spacing: .05em;
+         transform: rotate(-2.5deg); }
+.stamp.approve { color: var(--ok); } .stamp.revise { color: var(--bad); } .stamp.unevaluated { color: var(--warn); }
+.stamp.running, .stamp.awaiting { color: var(--accent); border-style: dashed; transform: none; font-size: 30px; }
+.reason { margin: 0 0 12px; text-align: center; font-size: 15px; }
+.stats { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 12px; margin: 14px 0 0; padding-top: 14px; border-top: 1px dashed var(--tag-line); }
+.stats div { margin: 0; }
+.stats dt { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; opacity: .7; }
+.stats dd { margin: 0; font: 600 22px/1.2 var(--display); font-variant-numeric: tabular-nums; }
+.foot { margin: 14px 0 0; font-size: 13px; opacity: .8; text-align: center; }
+
+.finding h2 { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.frow { display: grid; grid-template-columns: 170px minmax(0, 1fr); gap: 12px; padding: 10px 0; border-top: 1px solid var(--line); }
+.frow:first-of-type { border-top: 0; }
+.frow > span:first-child { color: var(--muted); font-size: 14px; }
+.frow .badges { margin: 0; }
+.callout { margin: 8px 0 0; padding: 10px 12px; border-radius: 8px; border-left: 4px solid; }
+.callout.t-bad, .callout.t-warn, .callout.t-info, .callout.t-ok { border-left-color: currentColor; }
+.callout > b { display: block; margin-bottom: 2px; }
+table { width: 100%; border-collapse: collapse; font-size: 14px; }
+th { text-align: left; font-weight: 600; color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .05em; }
+th, td { padding: 6px 8px 6px 0; border-bottom: 1px solid var(--line); }
+details > summary { cursor: pointer; color: var(--muted); font-size: 14px; }
+.answer-text { white-space: pre-wrap; margin: 10px 0 0; }
+
+/* Route card: one operation per model step */
+.route-list { position: relative; margin: 0; padding: 0; list-style: none; }
+.route-list::before { content: ""; position: absolute; left: 15px; top: 8px; bottom: 8px; width: 2px; background: var(--line); }
+.op { position: relative; display: grid; grid-template-columns: 32px minmax(0, 1fr); gap: 14px; padding: 6px 0 14px; }
+.op-node { position: relative; z-index: 1; width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center;
+           background: var(--card); border: 2px solid var(--accent); color: var(--accent); font: 600 14px/1 var(--display); }
+.op.answer .op-node { border-color: var(--ok); color: var(--ok); }
+.op-head { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; min-height: 32px; }
+.op-head b { font: 600 18px/1 var(--display); }
+.op-rows { display: flex; flex-direction: column; gap: 6px; margin-top: 6px; }
+.toolrow { border: 1px solid var(--line); border-radius: 8px; background: var(--card); }
+.toolrow[open] { background: var(--soft); }
+.toolrow-head { display: flex; align-items: center; gap: 10px; padding: 7px 12px; cursor: pointer; list-style: none; color: var(--ink); font-size: 15px; }
+.toolrow-head::-webkit-details-marker { display: none; }
+.toolrow-head::before { content: "›"; color: var(--muted); transition: transform .15s; }
+.toolrow[open] > .toolrow-head::before { transform: rotate(90deg); }
+.toolrow-head b { font-weight: 600; white-space: nowrap; }
+.toolrow-head .args { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+                      color: var(--muted); font: 13px var(--mono); }
+.toolrow-head .secs { color: var(--muted); font-size: 13px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.toolrow-body { padding: 0 12px 12px; }
+.toolrow > .error { margin: 0 12px 8px; }
+h3.sub { margin: 10px 0 0; font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+.fade { animation: fade .15s ease-out; }
+@keyframes fade { from { opacity: 0; transform: translateY(4px); } }
+
+@media (prefers-reduced-motion: reduce) { .running .dot, .fade { animation: none; } }
+@media (max-width: 1180px) { .outcome { grid-template-columns: 1fr; } .tag { max-width: 420px; } }
+@media (max-width: 900px) {
+  main { grid-template-columns: 1fr; padding: 12px 16px 32px; } .top { padding: 14px 16px 0; }
+  .tests { grid-template-columns: 1fr; } .frow { grid-template-columns: 1fr; gap: 4px; }
+}
 </style>
 </head>
 <body>
 <p id="conn" hidden>Disconnected from the console server. Retrying every second.</p>
+<header class="top">
+  <div class="brand">team04 <span>· run console</span></div>
+  <button id="live-pill" class="pill running" hidden><span class="dot"></span><span id="live-text"></span></button>
+</header>
 <main>
-  <div>
-    <section>
+  <aside class="rail">
+    <section class="card">
       <h2>Run a task live</h2>
-      <select id="task"></select>
-      <select id="instance"></select>
-      <p id="task-info" class="muted"></p>
-      <label class="muted">Type <code id="confirm-hint"></code> to confirm. This writes to the live tenant.
-        <input id="confirm" autocomplete="off"></label>
-      <button id="start">Start run</button>
-      <p id="start-error" class="error"></p>
-      <p id="job" class="muted"></p>
-      <button id="follow" hidden>Follow current run</button>
+      <label class="field">Task<select id="task"></select></label>
+      <label class="field">Instance<select id="instance"></select></label>
+      <p id="task-checks" class="small muted clamp"></p>
+      <div id="task-info" class="badges"></div>
+      <label class="field">Type <code id="confirm-hint"></code> to confirm. This writes to the live tenant.
+        <input id="confirm" autocomplete="off" spellcheck="false"></label>
+      <button id="start" class="primary">Start run</button>
+      <p id="start-error" class="error small"></p>
+      <p id="job" class="small muted"></p>
+      <button id="follow" class="secondary" hidden>Follow current run</button>
     </section>
-    <section>
+    <section class="card history">
       <h2>Past runs</h2>
-      <select id="base">
-        <option value="committed">Full runs (runs/)</option>
-        <option value="demo">Demo runs (runs/demo/)</option>
-      </select>
-      <ul id="runs"></ul>
+      <select id="root" aria-label="Run"></select>
+      <div id="root-total"></div>
+      <div id="grid" class="grid"></div>
+      <p class="legend">✓ approved · ✕ revise · ? unevaluated · ○ no saved run · — not run on this instance</p>
+    </section>
+  </aside>
+  <div class="detail">
+    <section id="empty" class="card empty">Pick a result under Past runs, or start a task live.</section>
+    <section id="head" class="card task-head" hidden>
+      <p id="detail-where" class="eyebrow"></p>
+      <h1 id="detail-title"></h1>
+      <div id="detail-meta" class="badges"></div>
+      <div class="tests">
+        <div><h3>What this task tests</h3><p id="detail-checks"></p></div>
+        <div><h3>Request sent to the agent</h3><blockquote id="detail-request"></blockquote></div>
+      </div>
+    </section>
+    <div id="outcome" class="outcome" hidden>
+      <section id="verdict" class="tag"></section>
+      <section id="finding" class="card finding"></section>
+    </div>
+    <section id="answer" class="card" hidden></section>
+    <section id="route" class="card" hidden>
+      <h2>Route: what the agent did, step by step</h2>
+      <ol id="events" class="route-list"></ol>
     </section>
   </div>
-  <section>
-    <h2 id="detail-title">Select a run</h2>
-    <div id="verdict"></div>
-    <div id="events"></div>
-  </section>
 </main>
 <script>
 const TOKEN = "{{TOKEN}}";
 const $ = id => document.getElementById(id);
-let tasks = [];
+let tasks = [], taskById = {}, instances = [], roots = [];
 // Every change of what the detail pane shows replaces `follow` (or bumps `view` for history), and a response
 // is drawn only if its view is still the one on screen. Without this, a slow poll can paint a live run's
 // steps into a past run that was clicked meanwhile.
 let view = 0;
 let follow = null;  // {jobId, offset} while the detail pane follows a live run
+let pane = null;    // per-view render state: step cards and running totals
+let lastJob = null, selected = null;
 
 function el(tag, cls, text) {
   const e = document.createElement(tag);
   if (cls) e.className = cls;
-  if (text !== undefined) e.textContent = text;
+  if (text !== undefined && text !== null) e.textContent = text;
   return e;
 }
 async function get(url) {
@@ -88,105 +245,440 @@ async function get(url) {
 }
 const q = params => new URLSearchParams(params).toString();
 const parsed = s => { try { return JSON.parse(s); } catch { return s; } };
+const setConn = ok => { $("conn").hidden = ok; };
 
-function setConn(ok) {
-  $("conn").hidden = ok;
+// Codes stay exact in a tooltip; the label is only for reading.
+const LABELS = {
+  answered: "Answered", partial: "Partly answered", refused: "Refused", changed_underneath: "Changed underneath",
+  applied: "Applied", not_approved: "Not approved", not_writable: "Not writable", write_rejected: "Write rejected",
+  write_not_persisted: "Write not persisted", dry_run: "Dry run", apply: "Applies changes",
+};
+const human = code => LABELS[code] || String(code).replace(/_/g, " ").replace(/\b(wo|so|eco|sco)(\d+)\b/gi,
+  (m, p, n) => p.toUpperCase() + n).replace(/^./, c => c.toUpperCase());
+const TONE = {answered: "t-ok", applied: "t-ok", partial: "t-warn", changed_underneath: "t-warn", refused: "t-info",
+              not_approved: "t-info", approve: "t-ok", revise: "t-bad", unevaluated: "t-warn"};
+function chip(text, cls, title) {
+  const c = el("span", "chip " + (cls || ""), text);
+  if (title) c.title = title;
+  return c;
+}
+function codeChip(code) { return chip(human(code), TONE[code] || "", String(code)); }
+function idChips(list, limit) {
+  const box = el("div", "badges");
+  for (const id of list.slice(0, limit)) box.append(chip(id, "mono"));
+  if (list.length > limit) {
+    const more = el("details");
+    more.append(el("summary", "", `${list.length - limit} more`));
+    const rest = el("div", "badges");
+    for (const id of list.slice(limit)) rest.append(chip(id, "mono"));
+    more.append(rest);
+    box.append(more);
+  }
+  return box;
 }
 function details(label, value) {
   const d = el("details");
   d.append(el("summary", "", label), el("pre", "", JSON.stringify(value, null, 1)));
   return d;
 }
-function eventNode(ev) {
-  const box = el("div", "ev " + ev.type);
-  if (ev.type === "start") {
-    box.append(el("div", "", `start  ${ev.instance}  ${ev.provider || ""} ${ev.model}\n${ev.request}`));
-  } else if (ev.type === "llm") {
-    box.append(el("div", "", ev.tool_calls.length
-      ? `step ${ev.step}  model calls: ${ev.tool_calls.map(c => c.name).join(", ")}`
-      : `step ${ev.step}  model answers:\n${ev.content || ""}`));
-  } else if (ev.type === "tool") {
-    box.append(el("div", ev.error ? "error" : "", `step ${ev.step}  ${ev.name}  ${ev.seconds}s`
-      + (ev.error ? `  ERROR ${ev.error}` : "")));
-    box.append(details("arguments", parsed(ev.arguments)), details("result", ev.result));
-  } else if (ev.type === "end") {
-    box.append(el("div", "", `end  ${ev.stop_reason}`));
-    if (ev.error) box.append(el("pre", "error", ev.error));
-    box.append(details("finding", ev.finding));
-  } else if (ev.type === "exception") {
-    box.append(el("pre", "error", `${ev.tool}: ${ev.traceback}`));
+function secs(s) {
+  if (s === null || s === undefined) return "—";
+  return s < 60 ? `${Math.round(s)} s` : `${Math.floor(s / 60)} min ${Math.round(s % 60)} s`;
+}
+
+// ---------------------------------------------------------------- detail pane
+
+function newPane(where, task, instance) {
+  pane = {steps: new Map(), lastStep: null, llm: 0, tools: 0, tokens: 0, tokensSeen: false, model: null,
+          seconds: null, live: false, instance, task};
+  $("empty").hidden = true;
+  for (const id of ["head", "outcome", "route"]) $(id).hidden = false;
+  $("answer").hidden = true;
+  $("detail-where").textContent = where;
+  $("detail-title").textContent = human(task.id);
+  $("detail-title").title = task.id;
+  $("detail-checks").textContent = task.checks || "No description in the task file.";
+  $("detail-request").textContent = task.prompt || "";
+  $("events").replaceChildren();
+  $("finding").replaceChildren();
+  renderMeta();
+}
+function renderMeta() {
+  const t = pane.task, box = $("detail-meta");
+  box.replaceChildren(chip(pane.instance, "mono"), codeChip(t.mode || "dry_run"));
+  if (t.fixture) box.append(chip("Writes fixture work orders", "t-warn"));
+  if (t.escalate) box.append(chip("May escalate, withdrawn after scoring", "t-info"));
+  if (pane.model) box.append(chip(pane.model, "mono"));
+}
+function renderTag(state) {
+  // state: {kind: "running"|"awaiting"|"verdict"|"lost", verdict, run, message}
+  const tag = $("verdict");
+  tag.replaceChildren(el("p", "kicker", "Inspection"));
+  if (state.kind === "running") {
+    tag.append(el("span", "stamp running", "Running"), el("p", "reason", "Steps appear as the agent takes them."));
+  } else if (state.kind === "awaiting") {
+    tag.append(el("span", "stamp awaiting", "Awaiting"), el("p", "reason", "The agent finished; the verifier has not scored it yet."));
+  } else if (state.kind === "lost") {
+    tag.append(el("span", "stamp unevaluated", "No result"), el("p", "reason error", state.message));
   } else {
-    box.append(details(ev.type, ev));
+    const v = state.run.verdict;
+    const word = v ? v.verdict : "unevaluated";
+    tag.append(el("span", "stamp " + (TONE[word] ? word : "unevaluated"),
+      {approve: "Approved", revise: "Revise", unevaluated: "Unevaluated"}[word] || word));
+    tag.append(el("p", "reason", v ? v.reason : "No verdict: not scored, never a pass."));
+    // A setup failure (bad credentials, tenant down) still exits 0; its cause is only in result.error.
+    if (state.run.result && state.run.result.error) tag.append(el("pre", "error", state.run.result.error));
+    const saved = state.run.persisted_before_verdict;
+    tag.append(el("p", "foot", saved === true ? "✓ Result saved before scoring · graded from the database, not the reply"
+      : saved === false ? "✕ Result written after the verdict" : "Graded from the database, not the reply"));
   }
+  tag.append(el("dl", "stats"));
+  renderStats();
+}
+function renderStats() {
+  const box = $("verdict").querySelector(".stats");
+  if (!box || !pane) return;
+  const live = pane.live && lastJob && lastJob.running ? (Date.now() - new Date(lastJob.started)) / 1000 : null;
+  const rows = [["Model steps", String(pane.llm)], ["Tool calls", String(pane.tools)],
+                ["Tokens", pane.tokensSeen ? pane.tokens.toLocaleString() : "—"],
+                [live !== null ? "Elapsed" : "Agent time", secs(live !== null ? live : pane.seconds)]];
+  box.replaceChildren(...rows.map(([k, v]) => { const d = el("div"); d.append(el("dt", "", k), el("dd", "", v)); return d; }));
+}
+function frow(label, ...content) {
+  const r = el("div", "frow");
+  const body = el("div");
+  body.append(...content);
+  r.append(el("span", "", label), body);
+  return r;
+}
+function counted(list) {
+  const counts = new Map();
+  for (const c of list || []) counts.set(c, (counts.get(c) || 0) + 1);
+  const box = el("div", "badges");
+  for (const [c, n] of counts) box.append(chip(n > 1 ? `${human(c)} ×${n}` : human(c), "", c));
   return box;
 }
-function addEvents(events) {
-  for (const ev of events) $("events").append(eventNode(ev));
+function money(value, currency) {
+  if (typeof value !== "number") return String(value);
+  try { return value.toLocaleString(undefined, {style: "currency", currency}); } catch { return value.toLocaleString(); }
 }
-function showVerdict(run) {
-  const box = $("verdict"), v = run.verdict;
-  box.replaceChildren(el("p", v ? v.verdict : "unevaluated",
-    v ? `${v.verdict}: ${v.reason}` : "No verdict: not scored, never a pass."));
-  box.append(el("p", "muted", `result.json on disk before verdict.json: ${run.persisted_before_verdict ?? "n/a"}`));
-  // A setup failure (bad credentials, tenant down) still exits 0; its cause is only in result.error.
-  if (run.result && run.result.error) box.append(el("pre", "error", run.result.error));
-  if (run.cleanup && run.cleanup.errors && run.cleanup.errors.length) {
-    box.append(el("p", "error", "Cleanup errors: an escalation may still be open. Check it by hand."));
+const SHOWN = new Set(["outcome", "work_order", "is_late", "currency", "blocking_causes", "contributing_causes",
+  "evidence_records", "potentially_blocked_work_orders", "blocked_sales_orders", "rescheduled", "customer_impact",
+  "not_visible", "escalations", "refusal_reason", "cost"]);
+function renderFinding(f, run, final) {
+  const box = $("finding");
+  box.replaceChildren();
+  const h = el("h2", "", "Finding");
+  box.append(h);
+  if (!f) {
+    box.append(el("p", final ? "callout t-warn" : "muted",
+      final ? "No finding recorded. The verifier grades the stored finding, so this run cannot pass."
+            : "The finding appears here when the agent records it."));
+    return;
   }
-  for (const k of ["interference", "cleanup"]) {
-    if (run[k]) box.append(details(k, run[k]));
+  h.append(codeChip(f.outcome));
+  if (f.work_order) h.append(chip(f.work_order, "mono"));
+  if (f.is_late === true) h.append(chip("Late", "t-bad"));
+  if (f.is_late === false) h.append(chip("Not late", "t-ok"));
+  box.append(el("p", "small muted", "The structured result the agent stored in the database. This is what the verifier grades."));
+  if (f.refusal_reason) {
+    const c = el("div", "callout t-info");
+    c.append(el("b", "", f.outcome === "refused" ? "Why it refused" : "What it could not do"), el("span", "", f.refusal_reason));
+    box.append(c);
   }
+  if ((f.blocking_causes || []).length) box.append(frow("Blocking causes", counted(f.blocking_causes)));
+  if ((f.contributing_causes || []).length) box.append(frow("Contributing causes", counted(f.contributing_causes)));
+  if ((f.potentially_blocked_work_orders || []).length) {
+    box.append(frow("Downstream work orders", el("div", "small muted",
+      `${f.potentially_blocked_work_orders.length} potentially blocked (potential, not confirmed)`),
+      idChips(f.potentially_blocked_work_orders, 8)));
+  }
+  if ((f.blocked_sales_orders || []).length) box.append(frow("Sales orders cited", idChips(f.blocked_sales_orders, 8)));
+  if (f.customer_impact) box.append(frow("Customer impact", el("span", "", f.customer_impact)));
+  if (f.cost && typeof f.cost === "object") {
+    const t = el("table"), tr = el("tr");
+    for (const k of Object.keys(f.cost)) tr.append(el("th", "", human(k)));
+    const vr = el("tr");
+    for (const v of Object.values(f.cost)) vr.append(el("td", "", money(v, f.currency)));
+    t.append(tr, vr);
+    box.append(frow("Cost", t));
+  }
+  if ((f.rescheduled || []).length) {
+    const t = el("table"), hr = el("tr");
+    for (const k of ["Work order", "New start", "New end", "Outcome"]) hr.append(el("th", "", k));
+    t.append(hr);
+    for (const r of f.rescheduled) {
+      const tr = el("tr");
+      const oc = el("td");
+      oc.append(codeChip(r.outcome));
+      tr.append(el("td", "mono", r.number), el("td", "", r.new_start || "—"), el("td", "", r.new_end || "—"), oc);
+      t.append(tr);
+    }
+    box.append(frow("Rescheduling", t));
+  }
+  const raised = (run && run.result && run.result.escalations) || [];
+  const esc = (f.escalations || []).length ? f.escalations : raised;
+  if (esc.length) {
+    const list = el("div");
+    const withdrawn = new Set((run && run.cleanup && run.cleanup.withdrawn) || []);
+    for (const e of esc) {
+      const full = raised.find(r => r.number && r.number === e.number) || {};
+      const line = el("div", "badges");
+      line.append(chip(e.number || "not raised", "mono"));
+      if (e.assignee || full.assignee) line.append(chip(e.assignee || full.assignee));
+      if (e.reason_code) line.append(codeChip(e.reason_code));
+      if (withdrawn.has(e.number)) line.append(chip("Withdrawn after scoring", "t-ok"));
+      else if (e.raised && run && run.cleanup) line.append(chip("Still open", "t-warn"));
+      list.append(line);
+    }
+    if (run && run.cleanup && (run.cleanup.errors || []).length) {
+      const c = el("div", "callout t-bad");
+      c.append(el("b", "", "Cleanup errors: an escalation may still be open. Check it by hand."),
+               el("pre", "", run.cleanup.errors.join("\n")));
+      list.append(c);
+    }
+    box.append(frow("Escalations", list));
+  }
+  if ((f.not_visible || []).length) box.append(frow("Not visible to this seat", counted(f.not_visible)));
+  for (const [k, v] of Object.entries(f)) {
+    if (!SHOWN.has(k) && v !== null && !(Array.isArray(v) && !v.length)) {
+      box.append(frow(human(k), typeof v === "object" ? details("Show", v) : el("span", "", String(v))));
+    }
+  }
+  if ((f.evidence_records || []).length) box.append(frow("Evidence records", idChips(f.evidence_records, 6)));
+  if (run && run.interference) box.append(frow("Interference", details("Another edit injected mid-run", run.interference)));
+  box.append(details("Raw finding", f));
+}
+function renderAnswer(text) {
+  const box = $("answer");
+  box.hidden = !text;
+  if (!text) return;
+  const d = el("details");
+  d.open = text.length < 700;
+  d.append(el("summary", "", "The agent's reply (shown for reading; not graded)"), el("p", "answer-text", text));
+  box.replaceChildren(d);
+}
+
+function stepCard(step) {
+  if (step === undefined || step === null) step = pane.lastStep;
+  if (step === undefined || step === null) step = 0;
+  let card = pane.steps.get(step);
+  if (!card) {
+    const li = el("li", "op fade"), body = el("div");
+    const head = el("div", "op-head"), rows = el("div", "op-rows");
+    head.append(el("b", "", `Step ${step + 1}`));
+    body.append(head, rows);
+    li.append(el("span", "op-node", String(step + 1)), body);
+    $("events").append(li);
+    card = {li, head, rows};
+    pane.steps.set(step, card);
+  }
+  pane.lastStep = Math.max(step, pane.lastStep ?? step);
+  return card;
+}
+function callout(card, cls, title, text) {
+  const c = el("div", "callout " + cls);
+  c.append(el("b", "", title));
+  if (text) c.append(el("span", "", text));
+  card.rows.append(c);
+  return c;
+}
+function toolRow(ev) {
+  const row = el("details", "toolrow"), head = el("summary", "toolrow-head");
+  const args = parsed(ev.arguments);
+  const preview = args && typeof args === "object" ? Object.entries(args).map(([k, v]) => `${k}: ${JSON.stringify(v)}`).join(", ")
+                                                  : String(args || "");
+  head.append(el("b", "", human(ev.name)), el("span", "args", preview));
+  const res = ev.result && typeof ev.result === "object" ? ev.result : null;
+  if (ev.error) head.append(chip("Error", "t-bad"));
+  else if (res && typeof res.outcome === "string") head.append(codeChip(res.outcome));
+  head.append(el("span", "secs", ev.seconds !== undefined ? `${ev.seconds} s` : ""));
+  row.append(head);
+  if (ev.error) { row.open = true; row.append(el("p", "error small", String(ev.error))); }
+  const body = el("div", "toolrow-body");
+  body.append(el("p", "small muted", `Tool ${ev.name}`), el("h3", "sub", "Arguments"), el("pre", "", JSON.stringify(args, null, 1)),
+              el("h3", "sub", "Result"), el("pre", "", JSON.stringify(ev.result, null, 1)));
+  row.append(body);
+  return row;
+}
+function addEvent(ev) {
+  if (ev.type === "start") {
+    pane.model = [ev.provider, ev.model].filter(Boolean).join(" · ");
+    if (ev.request) $("detail-request").textContent = ev.request;  // the task file holds a template
+    renderMeta();
+  } else if (ev.type === "llm") {
+    pane.llm++;
+    if (ev.usage && typeof ev.usage.total_tokens === "number") { pane.tokens += ev.usage.total_tokens; pane.tokensSeen = true; }
+    const card = stepCard(ev.step);
+    if (ev.tool_calls.length) {
+      card.head.append(el("span", "small muted", `${ev.tool_calls.length} tool call${ev.tool_calls.length > 1 ? "s" : ""}`));
+    } else {
+      card.li.classList.add("answer");
+      card.head.append(chip("Final reply", "t-ok"));
+      if (ev.content) card.rows.append(el("p", "answer-text small muted clamp", ev.content));
+    }
+  } else if (ev.type === "tool") {
+    pane.tools++;
+    stepCard(ev.step).rows.append(toolRow(ev));
+  } else if (ev.type === "wrap_up") {
+    stepCard(ev.step).head.append(chip("Forced to record a finding", "t-warn"));
+  } else if (ev.type === "approval") {
+    callout(stepCard(), ev.approved ? "t-ok" : "t-warn", `Write ${ev.approved ? "approved" : "not approved"}`,
+            ev.work_order || "");
+  } else if (ev.type === "interference") {
+    callout(stepCard(), "t-warn", "Someone else edited this order mid-run",
+            `${ev.number}: dates moved to ${ev.planned_start_date} – ${ev.planned_end_date}`);
+  } else if (ev.type === "exception") {
+    const c = callout(stepCard(), "t-bad", `${human(ev.tool)} raised an exception`);
+    c.append(el("pre", "", ev.traceback));
+  } else if (ev.type === "end") {
+    pane.seconds = ev.seconds;
+    const card = stepCard();
+    card.head.append(chip(`Stopped: ${human(ev.stop_reason)}`, ev.stop_reason === "final_answer" ? "" : "t-warn"));
+    if (ev.error) { const c = callout(card, "t-bad", "The model call failed"); c.append(el("pre", "", ev.error)); }
+    renderFinding(ev.finding, null, true);
+  } else {
+    stepCard().rows.append(details(human(ev.type), ev));
+  }
+}
+function addEvents(events) {
+  const atBottom = window.innerHeight + window.scrollY >= document.body.scrollHeight - 120;
+  for (const ev of events) addEvent(ev);
+  renderStats();
+  // Follow the newest step only when the viewer is already at the bottom, so reading earlier steps is never interrupted.
+  if (follow && events.length && atBottom) {
+    const last = $("events").lastElementChild;
+    if (last) last.scrollIntoView({block: "end", behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth"});
+  }
+}
+function showResult(run) {
+  pane.live = false;
+  if (run.result && typeof run.result.seconds === "number") pane.seconds = run.result.seconds;
+  renderTag({kind: "verdict", run});
+  renderFinding(run.result && run.result.finding, run, true);
+  renderAnswer(run.result && run.result.final_answer);
 }
 async function showRun(base, root, instance, task) {
   follow = null;
   const mine = ++view;
+  selected = `${base}|${root}|${instance}|${task}`;
+  markSelected();
   try {
     const run = await get("/api/run?" + q({base, root, instance, task}));
     if (mine !== view) return;
-    $("detail-title").textContent = `${root} / ${instance} / ${task}`;
-    $("events").replaceChildren();
+    newPane(`${base === "demo" ? "Demo run" : "Full run"} ${root} · ${instance}`, run.task || {id: task}, instance);
     addEvents(run.trace);
-    showVerdict(run);
+    showResult(run);
   } catch (e) {
-    if (mine === view) $("verdict").replaceChildren(el("p", "error", `Could not load this run: ${e.message}`));
+    if (mine !== view) return;
+    newPane(`${root} · ${instance}`, {id: task}, instance);
+    renderTag({kind: "lost", message: `Could not load this run: ${e.message}`});
   }
 }
-async function loadRuns() {
-  const base = $("base").value, list = $("runs");
-  let roots;
+
+// ---------------------------------------------------------------- past runs
+
+async function loadRuns(pick) {
+  let full, demo;
   try {
-    roots = await get("/api/runs?" + q({base}));
+    [full, demo] = await Promise.all([get("/api/runs?base=committed"), get("/api/runs?base=demo")]);
   } catch (e) {
-    list.replaceChildren(el("li", "error", `Could not list runs: ${e.message}`));
+    $("grid").replaceChildren(el("p", "error small", `Could not list runs: ${e.message}`));
     return;
   }
-  list.replaceChildren();
-  for (const r of roots) {
-    const li = el("li", "", r.complete ? `${r.name}  ${r.approved}/${r.scored_total} approved` : `${r.name}  incomplete`);
-    const ul = el("ul");
-    for (const t of r.tasks) {
-      const item = el("li", t.verdict || "unevaluated", `${t.verdict || "no verdict"}  ${t.instance}  ${t.task_id}`);
-      item.onclick = () => showRun(base, r.name, t.instance, t.task_id);
-      ul.append(item);
+  roots = [...full.map(r => ({...r, base: "committed"})), ...demo.map(r => ({...r, base: "demo"}))];
+  const sel = $("root"), keep = pick || sel.value;
+  sel.replaceChildren();
+  for (const [base, label] of [["committed", "Full runs"], ["demo", "Demo runs"]]) {
+    const group = el("optgroup");
+    group.label = label;
+    for (const r of roots.filter(r => r.base === base)) {
+      const o = el("option", "", r.complete ? `${r.name} · ${r.approved}/${r.scored_total} approved` : `${r.name} · incomplete`);
+      o.value = `${base}|${r.name}`;
+      group.append(o);
     }
-    li.append(ul);
-    list.append(li);
+    if (group.children.length) sel.append(group);
   }
+  if (keep && [...sel.options].some(o => o.value === keep)) sel.value = keep;
+  renderGrid();
 }
+function renderGrid() {
+  const [base, name] = ($("root").value || "|").split("|");
+  const r = roots.find(x => x.base === base && x.name === name);
+  const grid = $("grid"), total = $("root-total");
+  grid.replaceChildren();
+  total.replaceChildren();
+  if (!r) { grid.append(el("p", "muted small", "No runs yet.")); return; }
+  const got = new Map(r.tasks.map(t => [`${t.task_id}|${t.instance}`, t.verdict]));
+  const ids = [...new Set([...r.tasks.map(t => t.task_id), ...tasks.map(t => t.id)])].sort();
+  const cols = [...new Set([...instances, ...r.tasks.map(t => t.instance)])].sort();
+  if (r.complete) {
+    const t = el("div", "total");
+    t.append(el("span", "muted", "Approved"), el("b", "", `${r.approved} / ${r.scored_total}`));
+    const bar = el("div", "bar"), fill = el("i");
+    fill.style.width = r.scored_total ? `${(100 * r.approved) / r.scored_total}%` : "0";
+    bar.append(fill);
+    total.append(t, bar);
+  } else {
+    total.append(el("p", "small muted", "Incomplete run: still running, or stopped before the end."));
+  }
+  grid.style.setProperty("--cols", cols.length);
+  grid.append(el("span", "head"));
+  for (const c of cols) { const h = el("span", "head", c.slice(0, 3)); h.title = c; grid.append(h); }
+  for (const id of ids) {
+    const ran = r.tasks.filter(t => t.task_id === id);
+    const known = taskById[id];
+    if (!ran.length && base === "demo") continue;  // demo roots hold only what was run
+    const label = el("span", "name", human(id));
+    label.title = id;
+    grid.append(label);
+    for (const c of cols) {
+      const key = `${id}|${c}`, applies = known ? known.instances.includes(c) : got.has(key);
+      const b = el("button", "cell");
+      if (got.has(key)) {
+        const v = got.get(key) || "unevaluated";
+        b.className = "cell " + (TONE[v] ? v : "unevaluated");
+        b.textContent = {approve: "✓", revise: "✕"}[v] || "?";
+        b.setAttribute("aria-label", `${human(id)} on ${c}: ${got.get(key) || "no verdict"}`);
+        b.dataset.key = `${base}|${r.name}|${c}|${id}`;
+        b.onclick = () => showRun(base, r.name, c, id);
+      } else {
+        b.className = "cell " + (applies ? "none" : "na");
+        b.textContent = applies ? "○" : "—";
+        b.disabled = true;
+        b.setAttribute("aria-label", `${human(id)} on ${c}: ${applies ? "no saved run" : "not run on this instance"}`);
+      }
+      grid.append(b);
+    }
+  }
+  markSelected();
+}
+function markSelected() {
+  for (const b of $("grid").querySelectorAll(".cell")) b.classList.toggle("selected", b.dataset.key === selected);
+}
+
+// ---------------------------------------------------------------- live runs
+
 function updateHint() { $("confirm-hint").textContent = `${$("instance").value}/${$("task").value}`; }
 function fillInstances() {
-  const t = tasks.find(t => t.id === $("task").value);
+  const t = taskById[$("task").value];
   $("instance").replaceChildren(...t.instances.map(i => el("option", "", i)));
-  $("task-info").textContent = `mode ${t.mode || "dry_run"}` + (t.fixture ? ", writes fixture work orders" : "")
-    + (t.escalate ? ", may escalate (withdrawn after scoring)" : "");
+  $("task-checks").textContent = t.checks || "";
+  const info = $("task-info");
+  info.replaceChildren(codeChip(t.mode || "dry_run"));
+  if (t.fixture) info.append(chip("Writes fixture work orders", "t-warn"));
+  if (t.escalate) info.append(chip("May escalate", "t-info"));
   updateHint();
 }
 function attach(job) {
   ++view;
   follow = {jobId: job.job_id, offset: 0};
-  $("events").replaceChildren();
-  $("verdict").replaceChildren();
-  $("detail-title").textContent = `live: ${job.instance} / ${job.task_id}`;
+  selected = null;
+  markSelected();
+  newPane("Live run", taskById[job.task_id] || {id: job.task_id}, job.instance);
+  pane.live = true;
+  renderTag({kind: "running"});
+  renderFinding(null, null, false);
 }
 async function start() {
   const mine = view;
@@ -203,16 +695,28 @@ async function start() {
   }
   if (!r.ok) { $("start-error").textContent = `Refused: ${data.error}`; return; }
   $("confirm").value = "";
+  lastJob = data;
   if (mine === view) attach(data);
 }
 async function followCurrent() {
   const mine = view;
   try {
     const job = await get("/api/jobs/current");
+    lastJob = job;
     if (mine === view && job && job.running) attach(job);
   } catch (e) {
     setConn(false);
   }
+}
+function renderJob(job) {
+  const pill = $("live-pill");
+  pill.hidden = !(job && job.running);
+  if (job && job.running) {
+    $("live-text").textContent = `Running ${human(job.task_id)} on ${job.instance} · ${secs((Date.now() - new Date(job.started)) / 1000)}`;
+  }
+  const logFile = job ? job.log.split(/[\\/]/).pop() : "";
+  $("job").textContent = !job ? "" : `${human(job.task_id)} on ${job.instance}: `
+    + (job.running ? "running" : `finished, exit ${job.exit_code}`) + ` · log ${logFile}`;
 }
 async function poll() {
   let job;
@@ -224,9 +728,8 @@ async function poll() {
     setTimeout(poll, 1000);
     return;
   }
-  const logFile = job ? job.log.split(/[\\/]/).pop() : "";
-  $("job").textContent = !job ? "" : `${job.task_id} on ${job.instance}: `
-    + (job.running ? "running" : `finished, exit ${job.exit_code}`) + `  (log: ${logFile})`;
+  lastJob = job;
+  renderJob(job);
   const f = follow;
   $("follow").hidden = !(job && job.running && !(f && f.jobId === job.job_id));
   if (f && job && f.jobId === job.job_id) {
@@ -238,8 +741,9 @@ async function poll() {
         addEvents(t.events);
         f.offset = t.offset;
         if (!job.running) {
+          if (f === follow) renderTag({kind: "awaiting"});
           const run = await get("/api/run?" + q(where));
-          if (f === follow) { follow = null; showVerdict(run); loadRuns(); }
+          if (f === follow) { follow = null; showResult(run); loadRuns(`demo|${job.run_root}`); }
         }
       }
     } catch (e) {
@@ -249,25 +753,30 @@ async function poll() {
       else if (!job.running && f === follow) {
         follow = null;
         const logFile = job.log.split(/[\\/]/).pop();
-        $("verdict").replaceChildren(el("p", "error", `The run ended without a task directory. See runs/demo/${logFile}`));
+        renderTag({kind: "lost", message: `The run ended without a task directory. See runs/demo/${logFile}`});
       }
     }
   }
   setTimeout(poll, 1000);
 }
+setInterval(() => { if (lastJob && lastJob.running) { renderJob(lastJob); renderStats(); } }, 1000);
+
 (async () => {
   $("task").onchange = fillInstances;
   $("instance").onchange = updateHint;
   $("start").onclick = start;
   $("follow").onclick = followCurrent;
-  $("base").onchange = loadRuns;
+  $("live-pill").onclick = followCurrent;
+  $("root").onchange = renderGrid;
   try {
     tasks = await get("/api/tasks");
   } catch (e) {
     setConn(false);
     return;
   }
-  $("task").replaceChildren(...tasks.map(t => el("option", "", t.id)));
+  taskById = Object.fromEntries(tasks.map(t => [t.id, t]));
+  instances = [...new Set(tasks.flatMap(t => t.instances))].sort();
+  $("task").replaceChildren(...tasks.map(t => { const o = el("option", "", human(t.id)); o.value = t.id; return o; }));
   fillInstances();
   loadRuns();
   await followCurrent();  // a refresh during a run picks the live view back up

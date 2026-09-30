@@ -52,7 +52,8 @@ def make_server(port: int, bases: dict[str, Path], jobs: JobRunner) -> Threading
                 if url.path == "/api/tasks":
                     return self._send(200, [{"id": t["id"], "instances": jobs.instances_for(t["id"]),
                                              "mode": t.get("mode"), "escalate": bool(t.get("escalate")),
-                                             "fixture": t.get("fixture")} for t in jobs.tasks.values()])
+                                             "fixture": t.get("fixture"), "prompt": t.get("prompt"),
+                                             "checks": t.get("checks")} for t in jobs.tasks.values()])
                 if url.path == "/api/jobs/current":
                     return self._send(200, jobs.status())
                 if url.path == "/api/runs" and q.get("base") in bases:
