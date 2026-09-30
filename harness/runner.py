@@ -1,8 +1,9 @@
 """Run the task set.
 
     python -m harness.runner                         # all tasks, all instances they declare
-    python -m harness.runner --instance keystone --task refuse_unknown_wo
+    python -m harness.runner --instance keystone --task refuse_unknown_work_order
     python -m harness.runner --include-samples
+    python -m harness.runner --task why_late_wo48_subcontract --runs-dir runs/demo   # kept out of the checker's view
 
 Order per task: task.json -> fixture.json -> trace.jsonl (streamed) -> result.json, all fsync'd,
 and only then the verifier runs and writes verdict.json.
@@ -213,10 +214,12 @@ def main():
     ap.add_argument("--instance", choices=sorted(config.INSTANCES) + ["all"], default="all")
     ap.add_argument("--task", action="append", help="task id (repeatable)")
     ap.add_argument("--include-samples", action="store_true")
+    # Partial runs (a live demo of a few tasks) go elsewhere: the checker grades the newest runs/2026* root.
+    ap.add_argument("--runs-dir", type=Path, default=config.ROOT / "runs")
     args = ap.parse_args()
 
     tasks = [t for t in load_tasks(args.include_samples) if not args.task or t["id"] in args.task]
-    root = _new_run_root(config.ROOT / "runs")
+    root = _new_run_root(args.runs_dir)
     records = []
     for task in tasks:
         instances = task.get("instances", sorted(config.INSTANCES))
