@@ -1,5 +1,6 @@
 """The agent loop. No framework: messages in, tool calls out, every event traced."""
 import json
+import re
 import time
 import traceback
 import uuid
@@ -17,7 +18,7 @@ How you work:
 - Cite record numbers (WO-..., SCO-..., MR-..., SO-...) for every claim.
 - Call company_context first. Use its currency and country; never assume a country, tax regime or currency.
 - Other teams change this data while you run. Proposals carry a snapshot; apply_reschedule re-reads before writing.
-- For "why is it late": run diagnose_work_order. Separate BLOCKING causes (no known ready date) from contributing ones. Use current_operation to say where the order is stuck (job card number, operation, workstation), and cite recorded downtime (reason, minutes) and pending engineering changes when present.
+- For "why is it late": run diagnose_work_order. Separate BLOCKING causes (no known ready date) from contributing ones. Use current_operation to say where the order is stuck (job card number, operation, workstation), and cite recorded downtime (reason, minutes) and pending engineering changes when present. In record_finding, put every signal code with blocking=true in blocking_causes and every other signal code in contributing_causes, each as the bare code (e.g. material_request_open); the record numbers go in evidence_records.
 - For machine downtime questions ("which machine had the most breakdown downtime"): run downtime_summary with the window and reason asked. Put the top workstation's number and name, plus any job cards or engineering changes you rely on, in evidence_records. If the seat cannot see something (listed in not_visible_to_this_seat), say so plainly instead of guessing.
 - For "what does it block": run downstream_impact. Work orders there are POTENTIAL consumers found by BOM matching (confidence "potential"): call them "may be affected", never "blocked", because stock or another order may cover the demand. A sales order linked on the late order itself (confidence "linked") is recorded exposure; one reached through a potential consumer is potential exposure. Report customer, delivery date and value. Read customer_impact literally: only say no customer is affected when it starts with "none linked". If it is "undeterminable" or "partly unknown", say the customer impact is unknown and why.
 - For "can we take/finish this order by <date>": run order_feasible_by. Report its verdict verbatim. The verdict is never "yes": the platform models no work calendar and no labour capacity, so committing a date would be inventing one. Give the remaining work content in hours, the blockers, and say plainly what is missing. Put the verdict, the date asked and the remaining work content hours in record_finding's feasibility field, and the blockers in blocking_causes with their record numbers in evidence_records: only what you record there counts.
@@ -34,6 +35,10 @@ How you work:
 - Before your final answer you MUST call record_finding exactly once with the structured result, including outcome "refused" when you refuse.
 Final answer: short, plain language, sections Why late / What it blocks / Rescheduling / Not visible to me."""
 
+# A cause is a signal code, never prose: the verifiers match codes exactly. finite_schedule adds schedule_<code>
+# signals whose codes the platform owns, so this checks the shape rather than a fixed list.
+CAUSE_CODE = re.compile(r"^[a-z][a-z0-9_]*$")
+
 RECORD_FINDING_SCHEMA = {
     "type": "object",
     "properties": {
@@ -46,8 +51,12 @@ RECORD_FINDING_SCHEMA = {
         "currency": {"type": ["string", "null"], "description": "currency from company_context"},
         "cost": {"type": ["object", "null"], "description": "only when cost data exists",
                  "properties": {"expected": {"type": "number"}, "actual": {"type": "number"}, "variance": {"type": "number"}}},
-        "blocking_causes": {"type": "array", "items": {"type": "string"}, "description": "signal codes that block the order"},
-        "contributing_causes": {"type": "array", "items": {"type": "string"}},
+        "blocking_causes": {"type": "array", "items": {"type": "string", "pattern": CAUSE_CODE.pattern},
+                            "description": "bare signal codes with blocking=true, e.g. subcontract_not_sent; "
+                                           "record numbers go in evidence_records"},
+        "contributing_causes": {"type": "array", "items": {"type": "string", "pattern": CAUSE_CODE.pattern},
+                                "description": "bare codes of every other signal, e.g. material_request_open; "
+                                               "empty when there are none"},
         "evidence_records": {"type": "array", "items": {"type": "string"}, "description": "record numbers cited"},
         "potentially_blocked_work_orders": {"type": "array", "items": {"type": "string"},
                                             "description": "possible consumers found by BOM matching; not confirmed blocks"},
@@ -75,7 +84,7 @@ RECORD_FINDING_SCHEMA = {
             "reason_code": {"type": ["string", "null"]}}, "required": ["raised"]}},
         "refusal_reason": {"type": ["string", "null"]},
     },
-    "required": ["outcome", "work_order", "is_late", "currency", "blocking_causes", "evidence_records",
+    "required": ["outcome", "work_order", "is_late", "currency", "blocking_causes", "contributing_causes", "evidence_records",
                  "potentially_blocked_work_orders", "blocked_sales_orders", "rescheduled", "not_visible", "refusal_reason"],
 }
 
@@ -97,6 +106,16 @@ def _nulled_required(args: dict) -> list[str]:
         if not ("null" in declared if isinstance(declared, list) else declared == "null"):
             nulled.append(field)
     return nulled
+
+
+def _malformed_causes(args: dict) -> list:
+    """Cause entries that are not bare signal codes.
+
+    Seen live 2026-09-30 (z-ai/glm-5.3-flash): "subcontract_not_sent (SCO-2026-00024 draft, vendor ...)". The
+    pattern in the schema is advisory to the model, so it is checked here on the way back, like _nulled_required.
+    """
+    return [c for field in ("blocking_causes", "contributing_causes") for c in (args.get(field) or [])
+            if not (isinstance(c, str) and CAUSE_CODE.fullmatch(c))]
 
 
 def _fn(name, description, properties=None, required=None):
@@ -303,6 +322,11 @@ class ProductionAgent:
                 # the verifier scored revise) had that gap persisted and the run reported success.
                 return {"error": "these fields cannot be null", "fields": nulled,
                         "instruction": "call record_finding again with a real value for each listed field"}
+            malformed = _malformed_causes(args)
+            if malformed:
+                return {"error": "causes must be bare signal codes", "entries": malformed,
+                        "instruction": "call record_finding again with each cause as its code only (for example "
+                                       "subcontract_not_sent), and put record numbers in evidence_records"}
             cost = args.get("cost") or {}
             if cost and not (cost.get("expected") or cost.get("actual")):
                 return {"error": "cost must be null when no cost is recorded (expected and actual are 0 or missing)",
