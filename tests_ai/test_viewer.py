@@ -129,7 +129,10 @@ def fake_popen(procs):
     def popen(cmd, **kwargs):
         proc = SimpleNamespace(cmd=cmd, kwargs=kwargs, code=None)
         proc.poll = lambda: proc.code
-        Path(cmd[cmd.index("--runs-dir") + 1], f"20260930-12000{len(procs)}-000001").mkdir()
+        if "--runs-dir" in cmd:
+            Path(cmd[cmd.index("--runs-dir") + 1], f"20260930-12000{len(procs)}-000001").mkdir()
+        else:  # the agent CLI creates the exact directory it is handed
+            Path(cmd[cmd.index("--run-dir") + 1]).mkdir(parents=True)
         procs.append(proc)
         return proc
     return popen
@@ -276,3 +279,85 @@ def test_a_browser_start_with_the_local_origin_is_accepted(console):
 
     assert _call(console, "/api/jobs", body, headers)[0] == 200
     assert len(console.procs) == 1
+
+
+# ------------------------------------------------------------------ ask the agent
+
+
+def test_ask_runs_the_agent_cli_read_only_with_the_question_after_the_options(tmp_path):
+    procs = []
+    jobs = JobRunner(TASKS, tmp_path / "demo", popen=fake_popen(procs), adhoc_base=tmp_path / "adhoc")
+
+    status = jobs.ask("keystone", "  --apply everything now  ", "keystone/ask")
+
+    [proc] = procs
+    assert proc.cmd[:4] == [sys.executable, "-m", "prod_agent", "--instance"]
+    assert proc.cmd[-2:] == ["--", "--apply everything now"]
+    assert "--apply" not in proc.cmd[:-1] and "--escalate" not in proc.cmd
+    run_dir = Path(proc.cmd[proc.cmd.index("--run-dir") + 1])
+    assert run_dir.parent.name == "keystone" and run_dir.name == "ask"
+    assert proc.kwargs["start_new_session"] is True
+    assert (status["kind"], status["base"], status["task_id"]) == ("ask", "adhoc", "ask")
+    assert status["run_root"] == run_dir.parent.parent.name
+    assert runs.ROOT_NAME.fullmatch(status["run_root"])
+
+
+@pytest.mark.parametrize("instance,text,confirm", [
+    ("keystone", "   ", "keystone/ask"),
+    ("keystone", "x" * 1001, "keystone/ask"),
+    ("keystone", "why\x00late", "keystone/ask"),
+    ("keystone", "Where is the shop floor stuck?", "yes"),
+    ("keystone", "Where is the shop floor stuck?", "keystone/refuse_x"),
+    ("elsewhere", "Where is the shop floor stuck?", "elsewhere/ask"),
+])
+def test_ask_refuses_empty_long_or_unconfirmed_questions(tmp_path, instance, text, confirm):
+    procs = []
+    jobs = JobRunner(TASKS, tmp_path / "demo", popen=fake_popen(procs), adhoc_base=tmp_path / "adhoc")
+
+    with pytest.raises(JobError):
+        jobs.ask(instance, text, confirm)
+    assert procs == []
+
+
+def test_a_question_and_a_harness_run_never_overlap(tmp_path):
+    procs = []
+    jobs = JobRunner(TASKS, tmp_path / "demo", popen=fake_popen(procs), adhoc_base=tmp_path / "adhoc")
+    jobs.start("refuse_x", "suryodaya", "suryodaya/refuse_x")
+
+    with pytest.raises(JobError, match="in progress"):
+        jobs.ask("suryodaya", "Where is the shop floor stuck?", "suryodaya/ask")
+
+    procs[0].code = 0
+    jobs.ask("suryodaya", "Where is the shop floor stuck?", "suryodaya/ask")
+    with pytest.raises(JobError, match="in progress"):
+        jobs.start("refuse_x", "suryodaya", "suryodaya/refuse_x")
+
+
+def test_ask_run_is_served_through_the_adhoc_base(tmp_path):
+    procs = []
+    jobs = JobRunner(TASKS, tmp_path / "demo", popen=fake_popen(procs), adhoc_base=tmp_path / "adhoc")
+    server = make_server(0, {"committed": tmp_path / "runs", "demo": tmp_path / "demo", "adhoc": tmp_path / "adhoc"}, jobs)
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    try:
+        headers = {"X-Console-Token": server.token, "Content-Type": "application/json"}
+        body = {"instance": "keystone", "text": "Can we finish WO-1 by 2027-03-31?", "confirm": "keystone/ask"}
+        assert _call(server, "/api/ask", body)[0] == 403
+        status, out = _call(server, "/api/ask", body, headers)
+        assert status == 200
+        root = json.loads(out)["run_root"]
+        (tmp_path / "adhoc" / root / "keystone" / "ask" / "trace.jsonl").write_text('{"type": "start"}\n', encoding="utf-8")
+
+        listed = json.loads(_call(server, "/api/runs?base=adhoc")[1])
+        assert [(r["name"], r["tasks"][0]["verdict"]) for r in listed] == [(root, None)]
+        status, run = _call(server, f"/api/run?base=adhoc&root={root}&instance=keystone&task=ask")
+        assert status == 200 and json.loads(run)["verdict"] is None
+    finally:
+        server.shutdown()
+        server.server_close()
+
+
+def test_an_oversized_request_body_is_refused_before_it_is_read(console):
+    headers = {"X-Console-Token": console.token, "Content-Type": "application/json"}
+    status, _ = _call(console, "/api/ask", {"instance": "keystone", "text": "x" * 40000, "confirm": "keystone/ask"}, headers)
+    assert status == 413
+    assert console.procs == []

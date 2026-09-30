@@ -13,8 +13,8 @@ def main():
     ap.add_argument("--port", type=int, default=8765)
     args = ap.parse_args()
     runs_dir = config.ROOT / "runs"
-    jobs = JobRunner(load_tasks(include_samples=False), runs_dir / "demo")
-    server = make_server(args.port, {"committed": runs_dir, "demo": runs_dir / "demo"}, jobs)
+    jobs = JobRunner(load_tasks(include_samples=False), runs_dir / "demo", adhoc_base=runs_dir / "adhoc")
+    server = make_server(args.port, {"committed": runs_dir, "demo": runs_dir / "demo", "adhoc": runs_dir / "adhoc"}, jobs)
     print(f"Console on http://{HOST}:{args.port}  (Ctrl-C stops the console; a run in progress finishes on its own)")
     try:
         server.serve_forever()

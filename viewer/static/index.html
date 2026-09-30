@@ -123,6 +123,16 @@ main { display: flex; flex-direction: column; gap: 20px; min-width: 0; }
              background-size: 22.6px 22.6px; opacity: 0; }
 .run.busy .prog { opacity: 1; animation: crawl 1s linear infinite; }
 .run span:last-child { position: relative; }
+.modes { display: grid; grid-template-columns: 1fr 1fr; border: 1px solid var(--line-2); }
+.modes button { border: 0; padding: 8px; background: var(--surface); color: var(--ink-3); cursor: pointer;
+                font: 700 13px var(--display); letter-spacing: .1em; text-transform: uppercase; }
+.modes button + button { border-left: 1px solid var(--line-2); }
+.modes button[aria-pressed="true"] { background: var(--steel); color: var(--steel-ink); }
+.ask-text { width: 100%; min-height: 96px; resize: vertical; padding: 10px 12px; border-radius: 0; border: 1px solid var(--line-2);
+            border-left: 3px solid var(--hazard); background: var(--surface-2); color: var(--ink); font: 14px/1.45 var(--body); }
+.examples { display: flex; flex-wrap: wrap; gap: 6px; }
+.examples button { border: 1px solid var(--line-2); background: none; padding: 3px 8px; font: 12px var(--body); color: var(--ink-2); cursor: pointer; }
+.examples button:hover { background: var(--surface-2); }
 .ghost { border: 1px solid var(--ink); background: none; padding: 8px; font: 700 13px var(--display); letter-spacing: .12em;
          text-transform: uppercase; cursor: pointer; }
 .small { font-size: 12px; color: var(--ink-3); }
@@ -148,6 +158,7 @@ main { display: flex; flex-direction: column; gap: 20px; min-width: 0; }
 .cell.revise { background: var(--bad-soft); color: var(--bad); }
 .cell.unevaluated { background: var(--amber-soft); color: var(--amber); }
 .cell.none, .cell.na { cursor: default; }
+.cell.q { background: var(--surface-2); color: var(--ink-2); box-shadow: inset 0 0 0 1px var(--line-2); }
 .cell.selected { box-shadow: 0 0 0 1.5px var(--ink); }
 .legend { display: flex; flex-wrap: wrap; gap: 6px 12px; font: 11px var(--mono); color: var(--ink-3); }
 
@@ -181,6 +192,8 @@ main { display: flex; flex-direction: column; gap: 20px; min-width: 0; }
 :root[data-theme="light"] .stamp { mix-blend-mode: multiply; }
 .stamp.revise, .stamp.lost { border-color: var(--bad); color: var(--bad); }
 .stamp.unevaluated { border-color: var(--amber); color: var(--amber); }
+.stamp.ungraded { border-color: var(--ink-3); color: var(--ink-2); border-style: dashed; }
+.status.plain { background: var(--surface-2); color: var(--ink-2); }
 .stamp.running, .stamp.awaiting { border-style: dashed; border-width: 2px; border-color: var(--tag-ink); color: var(--tag-ink);
                                   font-size: 32px; transform: none; animation: none; opacity: .75; }
 .tag .reason { font-size: 13px; text-wrap: pretty; }
@@ -303,12 +316,23 @@ pre { margin: 8px 0 0; padding: 14px; background: var(--steel); color: oklch(0.8
     <section class="panel">
       <div class="ph"><span class="pn hz">01</span><span class="pt">Dispatch a job</span></div>
       <div class="pb">
-        <label class="field label">Task<select id="task"></select></label>
+        <div class="modes" role="group" aria-label="What to run">
+          <button id="mode-task" aria-pressed="true">Harness task</button><button id="mode-ask" aria-pressed="false">Ask the agent</button>
+        </div>
+        <label id="task-field" class="field label">Task<select id="task"></select></label>
         <label class="field label">Instance<select id="instance"></select></label>
-        <div class="criteria"><span class="label">Pass criteria</span><p id="task-checks"></p></div>
-        <div id="task-info" class="readout"></div>
+        <div id="task-part">
+          <div class="criteria"><span class="label">Pass criteria</span><p id="task-checks"></p></div>
+          <div id="task-info" class="readout" style="margin-top:14px"></div>
+        </div>
+        <div id="ask-part" hidden>
+          <label class="field label">Question<textarea id="ask-text" class="ask-text" maxlength="1000"
+            placeholder="Can we finish WO-2026-00048 by 2027-03-31?"></textarea></label>
+          <div class="examples" id="examples" style="margin-top:8px"></div>
+        </div>
         <div class="caution"><div>
-          <strong>CAUTION · WRITES TO LIVE TENANT</strong>
+          <strong id="caution-title">CAUTION · WRITES TO LIVE TENANT</strong>
+          <p id="caution-note" hidden>Not graded: no verifier exists for a free-text question. It records one finding row on the tenant; work-order changes and escalations are switched off.</p>
           <p>Type <code id="confirm-hint"></code> to release the interlock.</p>
           <input id="confirm" class="confirm" autocomplete="off" spellcheck="false" aria-label="Confirmation">
         </div></div>
@@ -365,7 +389,11 @@ let tasks = [], taskById = {}, instances = [], roots = [];
 let view = 0;
 let follow = null;  // {jobId, offset} while the detail pane follows a live run
 let pane = null;    // per-view render state: step cards and running totals
-let lastJob = null, selected = null;
+let lastJob = null, selected = null, mode = "task";
+const ASK_TASK = {id: "ask_the_agent", mode: "question",
+                  checks: "Free-text question. No verifier exists for it, so the answer is shown but never graded."};
+const EXAMPLES = ["Can we finish WO-2026-00048 by 2027-03-31?", "Where is the shop floor stuck right now?",
+                  "How loaded is the shop over the next three weeks?"];
 
 function el(tag, cls, text) {
   const e = document.createElement(tag);
@@ -395,7 +423,8 @@ function setTenant(name) { $("line-tenant").textContent = `tenant: ${name || "�
 const LABELS = {
   answered: "Answered", partial: "Partly answered", refused: "Refused", changed_underneath: "Changed underneath",
   applied: "Applied", not_approved: "Not approved", not_writable: "Not writable", write_rejected: "Write rejected",
-  write_not_persisted: "Write not persisted", dry_run: "Dry run", apply: "Applies changes",
+  write_not_persisted: "Write not persisted", dry_run: "Dry run", apply: "Applies changes", question: "Question · read-only",
+  ask_the_agent: "Ask the agent", ask: "Ask the agent",
 };
 const own = (o, k) => Object.hasOwn(o, k) ? o[k] : undefined;
 const human = code => own(LABELS, code) || String(code).replace(/_/g, " ").replace(/\b(wo|so|eco|sco)(\d+)\b/gi,
@@ -434,8 +463,8 @@ function secs(s) {
 
 // ---------------------------------------------------------------- detail pane
 
-function newPane(runNo, task, instance) {
-  pane = {steps: new Map(), lastStep: null, llm: 0, tools: 0, tokens: 0, tokensSeen: false, model: null, seconds: null,
+function newPane(runNo, task, instance, kind) {
+  pane = {kind: kind || "task", steps: new Map(), lastStep: null, llm: 0, tools: 0, tokens: 0, tokensSeen: false, model: null, seconds: null,
           live: false, instance, task, runNo, runId: null, workOrder: null, calls: []};
   $("empty").hidden = true;
   for (const id of ["head", "outcome", "route"]) $(id).hidden = false;
@@ -479,11 +508,30 @@ function renderTag(state) {
     tag.append(el("span", "stamp lost", "No result"), el("p", "reason error", state.message));
   } else {
     const v = state.run.verdict;
-    const word = v && own(TONE, v.verdict) ? v.verdict : "unevaluated";
-    setStatus({approve: "ok", revise: "bad", unevaluated: "warn"}[word],
-              {approve: "Released · passed QC", revise: "Held · rework", unevaluated: "Not inspected · not a pass"}[word]);
-    tag.append(el("span", "stamp " + word, {approve: "Approved", revise: "Revise", unevaluated: "Unevaluated"}[word]));
-    tag.append(el("p", "reason", v ? v.reason : "No verdict: not scored, never a pass."));
+    if (pane.kind === "ask") {
+      // No verifier, so the only honest signals are whether the agent finished and whether it recorded anything.
+      const res = state.run.result;
+      if (!res) {
+        setStatus("bad", "No result");
+        tag.append(el("span", "stamp lost", "No result"), el("p", "reason error", "The question ended before the agent wrote a result."));
+      } else if (res.stop_reason !== "final_answer" || !res.finding) {
+        setStatus("warn", `Not answered · ${human(res.stop_reason || "unknown")}`);
+        tag.append(el("span", "stamp unevaluated", "Not answered"),
+                   el("p", "reason", res.finding ? `The agent stopped early (${human(res.stop_reason || "unknown")}).`
+                                                 : "The agent recorded no finding, so there is nothing to read back."));
+      } else {
+        setStatus("plain", "Answered · not graded");
+        tag.append(el("span", "stamp ungraded", "Not graded"),
+                   el("p", "reason", "A free-text question has no verifier. Read the finding and reply, but nothing here was checked."));
+      }
+      if (res && res.error) tag.append(el("pre", "error", res.error));
+    } else {
+      const word = v && own(TONE, v.verdict) ? v.verdict : "unevaluated";
+      setStatus({approve: "ok", revise: "bad", unevaluated: "warn"}[word],
+                {approve: "Released · passed QC", revise: "Held · rework", unevaluated: "Not inspected · not a pass"}[word]);
+      tag.append(el("span", "stamp " + word, {approve: "Approved", revise: "Revise", unevaluated: "Unevaluated"}[word]));
+      tag.append(el("p", "reason", v ? v.reason : "No verdict: not scored, never a pass."));
+    }
     // A setup failure (bad credentials, tenant down) still exits 0; its cause is only in result.error.
     if (state.run.result && state.run.result.error) tag.append(el("pre", "error", state.run.result.error));
     const cleanupErrors = (state.run.cleanup && state.run.cleanup.errors) || [];
@@ -495,14 +543,19 @@ function renderTag(state) {
     }
   }
   const insp = el("div", "inspect");
-  for (const [k, v] of [["Inspected by", "verifier"], ["Source", "DB record"]]) {
+  for (const [k, v] of pane.kind === "ask" ? [["Inspected by", "nobody"], ["Source", "DB record"]]
+                                            : [["Inspected by", "verifier"], ["Source", "DB record"]]) {
     const d = el("div");
     d.append(el("span", "", k), el("b", "", v));
     insp.append(d);
   }
   tag.append(insp, el("dl", "stats"));
   const saved = state.kind === "verdict" ? state.run.persisted_before_verdict : null;
-  tag.append(el("p", "foot", saved === false ? "✕ Result written after the verdict"
+  if (pane.kind === "ask") {
+    const recorded = state.kind === "verdict" && state.run.result && state.run.result.finding;
+    tag.append(el("p", "foot", recorded ? "Recorded in the DB · not graded" : "Nothing recorded · not graded"));
+  }
+  else tag.append(el("p", "foot", saved === false ? "✕ Result written after the verdict"
     : saved === true ? "Saved before scoring · graded from DB, not the reply" : "Graded from DB, not the reply"));
   renderStats();
 }
@@ -775,12 +828,13 @@ async function showRun(base, root, instance, task) {
   try {
     const run = await get("/api/run?" + q({base, root, instance, task}));
     if (mine !== view) return;
-    newPane(root, run.task || {id: task}, instance);
+    const ask = base === "adhoc";
+    newPane(root, ask ? ASK_TASK : run.task || {id: task}, instance, ask ? "ask" : "task");
     addEvents(run.trace);
     showResult(run);
   } catch (e) {
     if (mine !== view) return;
-    newPane(root, {id: task}, instance);
+    newPane(root, base === "adhoc" ? ASK_TASK : {id: task}, instance, base === "adhoc" ? "ask" : "task");
     renderTag({kind: "lost", message: `Could not load this run: ${e.message}`});
   }
 }
@@ -788,21 +842,23 @@ async function showRun(base, root, instance, task) {
 // ---------------------------------------------------------------- QC log
 
 async function loadRuns(pick) {
-  let full, demo;
+  let full, demo, adhoc;
   try {
-    [full, demo] = await Promise.all([get("/api/runs?base=committed"), get("/api/runs?base=demo")]);
+    [full, demo, adhoc] = await Promise.all(["committed", "demo", "adhoc"].map(b => get("/api/runs?" + q({base: b}))));
   } catch (e) {
     $("grid").replaceChildren(el("p", "error small", `Could not list runs: ${e.message}`));
     return;
   }
-  roots = [...full.map(r => ({...r, base: "committed"})), ...demo.map(r => ({...r, base: "demo"}))];
+  roots = [...full.map(r => ({...r, base: "committed"})), ...demo.map(r => ({...r, base: "demo"})),
+           ...adhoc.map(r => ({...r, base: "adhoc"}))];
   const sel = $("root"), keep = pick || sel.value;
   sel.replaceChildren();
-  for (const [base, label] of [["committed", "Full runs"], ["demo", "Demo runs"]]) {
+  for (const [base, label] of [["committed", "Full runs"], ["demo", "Demo runs"], ["adhoc", "Questions"]]) {
     const group = el("optgroup");
     group.label = label;
     for (const r of roots.filter(r => r.base === base)) {
-      const o = el("option", "", r.complete ? `${r.name} · ${r.approved}/${r.scored_total} approved` : `${r.name} · incomplete`);
+      const o = el("option", "", base === "adhoc" ? `${r.name} · ${r.tasks.map(t => t.instance).join(", ") || "starting"} · not graded`
+        : r.complete ? `${r.name} · ${r.approved}/${r.scored_total} approved` : `${r.name} · incomplete`);
       o.value = `${base}|${r.name}`;
       group.append(o);
     }
@@ -820,9 +876,12 @@ function renderGrid() {
   $("root-id").textContent = r ? `#${r.name}` : "";
   if (!r) { grid.append(el("p", "small", "No runs yet.")); return; }
   const got = new Map(r.tasks.map(t => [`${t.task_id}|${t.instance}`, t.verdict]));
-  const ids = [...new Set([...r.tasks.map(t => t.task_id), ...tasks.map(t => t.id)])].sort();
+  const ids = base === "adhoc" ? [...new Set(r.tasks.map(t => t.task_id))]
+    : [...new Set([...r.tasks.map(t => t.task_id), ...tasks.map(t => t.id)])].sort();
   const cols = [...new Set([...instances, ...r.tasks.map(t => t.instance)])].sort();
-  if (r.complete) {
+  if (base === "adhoc") {
+    total.append(el("p", "small", "A free-text question: shown for reading, never graded."));
+  } else if (r.complete) {
     const pct = r.scored_total ? Math.round((100 * r.approved) / r.scored_total) : 0;
     const y = el("div", "yield"), left = el("div"), right = el("div");
     const big = el("span", "big", String(pct));
@@ -847,7 +906,7 @@ function renderGrid() {
   for (const id of ids) {
     const ran = r.tasks.filter(t => t.task_id === id);
     const known = taskById[id];
-    if (!ran.length && base === "demo") continue;  // demo roots hold only what was run
+    if (!ran.length && base !== "committed") continue;  // demo and question roots hold only what was run
     const label = el("span", "name", human(id));
     label.title = id;
     label.dataset.row = `${base}|${r.name}|${id}`;
@@ -858,7 +917,8 @@ function renderGrid() {
       if (got.has(key)) {
         const v = got.get(key) || "unevaluated";
         b.className = "cell " + (own(TONE, v) ? v : "unevaluated");
-        b.textContent = {approve: "✓", revise: "✕"}[v] || "?";
+        b.textContent = base === "adhoc" ? "Q" : {approve: "✓", revise: "✕"}[v] || "?";
+        if (base === "adhoc") b.className = "cell q";
         b.setAttribute("aria-label", `${human(id)} on ${c}: ${got.get(key) || "no verdict"}`);
         b.dataset.key = `${base}|${r.name}|${c}|${id}`;
         b.onclick = () => showRun(base, r.name, c, id);
@@ -881,7 +941,31 @@ function markSelected() {
 
 // ---------------------------------------------------------------- dispatch and live runs
 
-function updateHint() { $("confirm-hint").textContent = `${$("instance").value}/${$("task").value}`; }
+function updateHint() { $("confirm-hint").textContent = `${$("instance").value}/${mode === "ask" ? "ask" : $("task").value}`; }
+function setMode(next) {
+  mode = next;
+  const ask = mode === "ask";
+  $("mode-task").setAttribute("aria-pressed", String(!ask));
+  $("mode-ask").setAttribute("aria-pressed", String(ask));
+  $("task-field").hidden = ask;
+  $("task-part").hidden = ask;
+  $("ask-part").hidden = !ask;
+  $("caution-title").textContent = ask ? "CAUTION · RUNS ON THE LIVE TENANT" : "CAUTION · WRITES TO LIVE TENANT";
+  $("caution-note").hidden = !ask;
+  if (ask) {
+    const keep = $("instance").value;
+    $("instance").replaceChildren(...instances.map(i => el("option", "", i)));
+    if (instances.includes(keep)) $("instance").value = keep;
+  } else {
+    const keep = $("instance").value;
+    fillInstances();
+    if (taskById[$("task").value] && taskById[$("task").value].instances.includes(keep)) $("instance").value = keep;
+  }
+  $("confirm").value = "";
+  $("start-error").textContent = "";
+  updateHint();
+  renderJob(lastJob);
+}
 function fillInstances() {
   const t = taskById[$("task").value];
   $("instance").replaceChildren(...t.instances.map(i => el("option", "", i)));
@@ -911,7 +995,8 @@ function attach(job) {
   follow = {jobId: job.job_id, offset: 0};
   selected = null;
   markSelected();
-  newPane("live", taskById[job.task_id] || {id: job.task_id}, job.instance);
+  const ask = job.kind === "ask";
+  newPane("live", ask ? ASK_TASK : taskById[job.task_id] || {id: job.task_id}, job.instance, ask ? "ask" : "task");
   pane.live = true;
   renderTag({kind: "running"});
   renderFinding(null, null, false);
@@ -919,10 +1004,12 @@ function attach(job) {
 async function start() {
   const mine = view;
   $("start-error").textContent = "";
-  const body = {task_id: $("task").value, instance: $("instance").value, confirm: $("confirm").value};
+  const ask = mode === "ask";
+  const body = ask ? {text: $("ask-text").value, instance: $("instance").value, confirm: $("confirm").value}
+                   : {task_id: $("task").value, instance: $("instance").value, confirm: $("confirm").value};
   let r, data;
   try {
-    r = await fetch("/api/jobs", {method: "POST", body: JSON.stringify(body),
+    r = await fetch(ask ? "/api/ask" : "/api/jobs", {method: "POST", body: JSON.stringify(body),
       headers: {"Content-Type": "application/json", "X-Console-Token": TOKEN}});
     data = await r.json();
   } catch (e) {
@@ -953,7 +1040,7 @@ function renderJob(job) {
   const btn = $("start");
   btn.disabled = running;
   btn.classList.toggle("busy", running);
-  $("start-label").textContent = running ? `CYCLE RUNNING · ${elapsed}` : "▶ START RUN";
+  $("start-label").textContent = running ? `CYCLE RUNNING · ${elapsed}` : mode === "ask" ? "▶ ASK THE AGENT" : "▶ START RUN";
   const logFile = job ? job.log.split(/[\\/]/).pop() : "";
   $("job").textContent = !job ? "" : `${human(job.task_id)} on ${job.instance}: `
     + (job.running ? "running" : `finished, exit ${job.exit_code}`) + ` · log ${logFile}`;
@@ -974,7 +1061,7 @@ async function poll() {
   $("follow").hidden = !(job && job.running && !(f && f.jobId === job.job_id));
   if (f && job && f.jobId === job.job_id) {
     // Status first, then the trace: once the job reads as finished, the trace read after it is complete.
-    const where = {base: "demo", root: job.run_root || "", instance: job.instance, task: job.task_id};
+    const where = {base: job.base || "demo", root: job.run_root || "", instance: job.instance, task: job.task_id};
     try {
       const t = await get("/api/trace?" + q({...where, offset: f.offset}));
       if (f === follow) {
@@ -988,11 +1075,11 @@ async function poll() {
           }
           if (run && f === follow) {
             follow = null;
-            selected = `demo|${job.run_root}|${job.instance}|${job.task_id}`;
+            selected = `${where.base}|${job.run_root}|${job.instance}|${job.task_id}`;
             pane.runNo = job.run_root;
             renderMeta();
             showResult(run);
-            loadRuns(`demo|${job.run_root}`);
+            loadRuns(`${where.base}|${job.run_root}`);
           }
         }
       }
@@ -1004,7 +1091,7 @@ async function poll() {
         follow = null;
         pane.live = false;
         const logFile = job.log.split(/[\\/]/).pop();
-        renderTag({kind: "lost", message: `The run ended without a task directory. See runs/demo/${logFile}`});
+        renderTag({kind: "lost", message: `The run ended without a run directory. See runs/${where.base}/${logFile}`});
       }
     }
   }
@@ -1024,7 +1111,10 @@ $("night").onclick = () => setTheme(true);
 
 (async () => {
   $("task").onchange = () => { fillInstances(); rememberDispatch(); };
-  $("instance").onchange = () => { updateHint(); rememberDispatch(); if (!pane) setTenant($("instance").value); };
+  $("instance").onchange = () => { updateHint(); if (mode === "task") rememberDispatch(); if (!pane) setTenant($("instance").value); };
+  $("mode-task").onclick = () => setMode("task");
+  $("mode-ask").onclick = () => setMode("ask");
+  $("examples").replaceChildren(...EXAMPLES.map(t => { const b = el("button", "", t); b.type = "button"; b.onclick = () => { $("ask-text").value = t; }; return b; }));
   $("start").onclick = start;
   $("follow").onclick = followCurrent;
   $("live-pill").onclick = followCurrent;

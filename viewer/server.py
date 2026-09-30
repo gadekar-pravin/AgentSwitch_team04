@@ -16,6 +16,7 @@ from .jobs import JobError, JobRunner
 
 HOST = "127.0.0.1"
 STATIC = Path(__file__).parent / "static"
+MAX_BODY = 32 * 1024
 
 
 def make_server(port: int, bases: dict[str, Path], jobs: JobRunner) -> ThreadingHTTPServer:
@@ -76,14 +77,21 @@ def make_server(port: int, bases: dict[str, Path], jobs: JobRunner) -> Threading
                     or (origin is not None and origin.removeprefix("http://") not in self._local()) \
                     or not secrets.compare_digest(self.headers.get("X-Console-Token", ""), token):
                 return self._send(403, {"error": "forbidden"})
-            if urlparse(self.path).path != "/api/jobs":
+            path = urlparse(self.path).path
+            if path not in ("/api/jobs", "/api/ask"):
                 return self._send(404, {"error": "not found"})
             try:
-                body = json.loads(self.rfile.read(int(self.headers.get("Content-Length", "0"))) or b"{}")
+                length = int(self.headers.get("Content-Length", "0"))
+                # Checked before reading, so an oversized or negative length never reaches rfile.read.
+                if not 0 <= length <= MAX_BODY:
+                    return self._send(413, {"error": f"request body must be at most {MAX_BODY} bytes"})
+                body = json.loads(self.rfile.read(length) or b"{}")
                 if not isinstance(body, dict):
                     raise ValueError("expected a JSON object")
-                return self._send(200, jobs.start(str(body.get("task_id", "")), str(body.get("instance", "")),
-                                                  str(body.get("confirm", ""))))
+                instance, confirm = str(body.get("instance", "")), str(body.get("confirm", ""))
+                if path == "/api/ask":
+                    return self._send(200, jobs.ask(instance, str(body.get("text", "")), confirm))
+                return self._send(200, jobs.start(str(body.get("task_id", "")), instance, confirm))
             except (JobError, ValueError) as e:
                 return self._send(400, {"error": str(e)})
 

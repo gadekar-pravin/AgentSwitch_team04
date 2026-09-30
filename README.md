@@ -119,6 +119,12 @@ A local page for the screen-shared live demo. Pick a harness task and an instanc
 asks for, and watch the agent's steps arrive, then the verdict and the evidence behind it (the finding in the
 database, the write ordering, interference and cleanup). It also browses past runs.
 
+**Ask the agent** takes a free-text question instead ("Can we finish WO-2026-00048 by 2027-03-31?", "Where is
+the shop floor stuck right now?"). It runs `python -m prod_agent --instance <name> --run-dir … -- "<question>"`
+with no `--apply` and no `--escalate`, so it can read and record a finding but never change an order or page a
+person. No verifier exists for a free-text question, so its tag reads **Not graded**; for a graded feasibility
+answer run the `feasible_by_wo48` task. Questions land in `runs/adhoc/` and show under **Questions** in the QC log.
+
 - It starts the same command you would type: `python -m harness.runner --task <id> --instance <name>
   --runs-dir runs/demo`. Every click is a live run against a shared tenant.
 - Demo runs land in `runs/demo/`, never `runs/2026*`, so a partial run cannot become the run
@@ -143,8 +149,10 @@ database, the write ordering, interference and cleanup). It also browses past ru
 
 **Demo order** (agent time from the 17 Sep run): `refuse_unknown_work_order` on keystone (~15 s) →
 `why_late_wo48_subcontract` (~70 s) → `concurrent_edit_before_write` (~100 s; writes fixture rows, escalation
-withdrawn after scoring). Show `escalate_blocked_wo48` (~190 s) from past runs instead of live. If a tenant is
-down, walk through `runs/20260917-110938` in the same page.
+withdrawn after scoring) → `feasible_by_wo48` ("can we finish WO-48 by 2027-03-31?", graded) → one question in
+**Ask the agent** from a grader. Show `escalate_blocked_wo48` (~190 s) from past runs instead of live. These times
+are from `gpt-4.1`; slower models take longer (the OpenRouter rehearsals took about 80 s for the refusal). If a
+tenant is down, walk through `runs/20260917-110938` in the same page.
 
 ## Layout
 
