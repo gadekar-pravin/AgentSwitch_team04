@@ -31,6 +31,7 @@ How you work:
 - Do not accept a false premise. If the user says an order is late but diagnose_work_order shows is_late=false, say it is not past due (record is_late=false) and still report what is holding it.
 - Costs: expected_cost and actual_cost are on the work order (diagnose_work_order). Variance = actual - expected, in the company currency. If both are 0 or missing, no cost has been recorded: say so and do not compute a variance (cost=null, outcome partial or refused).
 - Platform names: job cards = JobCard, downtime log = DowntimeEntry, engineering changes = EngineeringChangeOrder, sales/customer orders = SalesOrder, purchase orders and receipt dates = PurchaseOrder, stock movements = StockEntry, operators/people and their contact details = Employee, payroll = SalarySlip (another app). For anything else call seat_entities. Before refusing for lack of access, confirm with seat_capability on the REAL entity, and put that exact entity name in not_visible. If seat_capability returns outside_seat, that entity is a real limit: put it in not_visible. If it returns entity_in_catalogue, the entity IS visible (you only guessed the operation name): never list it in not_visible. If it returns a warning, you used a wrong name: retry with a real one.
+- If a work order named in the request is not found, refuse with work_order set to that number. Never substitute a similar or "closest" order: a planner who mistyped a number must be told, not answered about another order.
 - Refuse when the data cannot support an answer or the seat is not permitted: the work order does not exist, the entity is not visible, or the requested change is outside this seat (for example changing a sales order delivery date, cancelling a work order, or reading payroll). Refusing correctly is a success, not a failure.
 - Before your final answer you MUST call record_finding exactly once with the structured result, including outcome "refused" when you refuse.
 Final answer: short, plain language, sections Why late / What it blocks / Rescheduling / Not visible to me."""
@@ -38,6 +39,7 @@ Final answer: short, plain language, sections Why late / What it blocks / Resche
 # A cause is a signal code, never prose: the verifiers match codes exactly. finite_schedule adds schedule_<code>
 # signals whose codes the platform owns, so this checks the shape rather than a fixed list.
 CAUSE_CODE = re.compile(r"^[a-z][a-z0-9_]*$")
+WO_NUMBER = re.compile(r"\bWO-\d{4}-\d{5}\b")
 
 RECORD_FINDING_SCHEMA = {
     "type": "object",
@@ -159,6 +161,8 @@ class ProductionAgent:
         self.finding: dict | None = None
         self.finding_record: dict | None = None
         self._seen_calls: dict[tuple[str, str], int] = {}
+        self.requested_orders: set[str] = set()  # WO numbers named in the request
+        self.missing_orders: set[str] = set()  # refs a work-order tool reported as not found
         # Reads REPEAT_GUARDED already promises are "still current" for the rest of the run, kept so
         # propose_reschedule does not re-run a diagnosis and a BOM walk the model has already paid for.
         self._reads: dict[tuple[str, str], dict] = {}
@@ -245,6 +249,12 @@ class ProductionAgent:
         return None
 
     def _dispatch(self, name: str, args: dict):
+        result = self._dispatch_tool(name, args)
+        if isinstance(result, dict) and result.get("found") is False and args.get("work_order"):
+            self.missing_orders.add(args["work_order"])
+        return result
+
+    def _dispatch_tool(self, name: str, args: dict):
         ref = args.get("work_order")
         if name == "company_context":
             return domain.company_context(self.mcp)
@@ -322,6 +332,14 @@ class ProductionAgent:
                 # the verifier scored revise) had that gap persisted and the run reported success.
                 return {"error": "these fields cannot be null", "fields": nulled,
                         "instruction": "call record_finding again with a real value for each listed field"}
+            asked_missing = sorted(self.requested_orders & self.missing_orders)
+            if asked_missing and args.get("work_order") not in self.requested_orders | {None}:
+                # Seen live 2026-09-30: asked about WO-2026-09999, which does not exist, the model diagnosed
+                # WO-2026-00099 as the "closest match" and recorded that order's causes as the answer.
+                return {"error": f"{', '.join(asked_missing)} was asked about and does not exist; "
+                                 f"this finding is about {args.get('work_order')!r}",
+                        "instruction": "call record_finding again with work_order set to the number asked, "
+                                       "outcome refused, and no causes, blocked orders or reschedules"}
             malformed = _malformed_causes(args)
             if malformed:
                 return {"error": "causes must be bare signal codes", "entries": malformed,
@@ -386,6 +404,7 @@ class ProductionAgent:
     def run(self, request: str) -> dict:
         started = time.time()
         messages = [{"role": "system", "content": SYSTEM_PROMPT}, {"role": "user", "content": request}]
+        self.requested_orders = set(WO_NUMBER.findall(request))
         self.trace({"type": "start", "run_id": self.run_id, "instance": self.mcp.session.instance,
                     "provider": self.provider, "model": self.model, "apply_mode": self.apply_mode, "request": request})
         final, stop_reason = None, "max_steps"
