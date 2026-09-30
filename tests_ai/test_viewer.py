@@ -6,6 +6,9 @@ The graded, hand-written tests live in tests/.
 import json
 import os
 import sys
+import threading
+import urllib.error
+import urllib.request
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -14,6 +17,7 @@ import pytest
 from prod_agent import config
 from viewer import runs
 from viewer.jobs import JobError, JobRunner
+from viewer.server import make_server
 
 ROOT = "20260930-101500-000001"
 
@@ -182,3 +186,74 @@ def test_no_status_before_any_run(tmp_path):
 def test_task_without_declared_instances_runs_on_every_instance(tmp_path):
     jobs = JobRunner([{"id": "plain"}], tmp_path / "demo")
     assert jobs.instances_for("plain") == sorted(config.INSTANCES)
+
+
+@pytest.fixture
+def console(tmp_path):
+    committed = tmp_path / "runs"
+    _task_dir(committed, ROOT, "suryodaya", "refuse_x", verdict="approve", trace=[{"type": "start"}])
+    procs = []
+    jobs = JobRunner(TASKS, tmp_path / "demo", popen=fake_popen(procs))
+    server = make_server(0, {"committed": committed, "demo": tmp_path / "demo"}, jobs)
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    server.procs = procs
+    yield server
+    server.shutdown()
+    server.server_close()
+
+
+def _call(server, path, body=None, headers=None):
+    url = f"http://127.0.0.1:{server.server_address[1]}{path}"
+    data = None if body is None else json.dumps(body).encode("utf-8")
+    req = urllib.request.Request(url, data=data, headers=headers or {}, method="POST" if data else "GET")
+    try:
+        with urllib.request.urlopen(req, timeout=5) as resp:
+            return resp.status, resp.read().decode("utf-8")
+    except urllib.error.HTTPError as e:
+        return e.code, e.read().decode("utf-8")
+
+
+def test_page_carries_the_session_token(console):
+    status, page = _call(console, "/")
+    assert status == 200
+    assert console.token in page and "{{TOKEN}}" not in page
+
+
+def test_past_runs_and_one_task_run_are_served(console):
+    status, body = _call(console, "/api/runs?base=committed")
+    assert status == 200
+    assert json.loads(body)[0]["tasks"][0]["verdict"] == "approve"
+
+    status, body = _call(console, f"/api/run?base=committed&root={ROOT}&instance=suryodaya&task=refuse_x")
+    assert status == 200
+    assert json.loads(body)["trace"] == [{"type": "start"}]
+
+
+def test_a_path_outside_the_run_layout_is_not_found(console):
+    status, _ = _call(console, "/api/run?base=committed&root=..&instance=suryodaya&task=refuse_x")
+    assert status == 404
+
+
+def test_a_foreign_host_header_is_refused(console):
+    status, _ = _call(console, "/api/tasks", headers={"Host": "evil.test"})
+    assert status == 403
+
+
+def test_starting_a_run_needs_the_token_and_a_local_origin(console):
+    body = {"task_id": "refuse_x", "instance": "suryodaya", "confirm": "suryodaya/refuse_x"}
+    assert _call(console, "/api/jobs", body)[0] == 403
+    assert _call(console, "/api/jobs", body, {"X-Console-Token": console.token, "Origin": "https://evil.test"})[0] == 403
+    assert console.procs == []
+
+
+def test_a_confirmed_start_runs_once_and_a_mismatched_one_is_refused(console):
+    headers = {"X-Console-Token": console.token, "Content-Type": "application/json"}
+    bad = {"task_id": "refuse_x", "instance": "suryodaya", "confirm": "yes"}
+    assert _call(console, "/api/jobs", bad, headers)[0] == 400
+
+    good = dict(bad, confirm="suryodaya/refuse_x")
+    status, body = _call(console, "/api/jobs", good, headers)
+    assert status == 200
+    assert json.loads(body)["running"] is True
+    assert len(console.procs) == 1
+    assert json.loads(_call(console, "/api/jobs/current")[1])["task_id"] == "refuse_x"
