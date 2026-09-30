@@ -257,3 +257,12 @@ def test_a_confirmed_start_runs_once_and_a_mismatched_one_is_refused(console):
     assert json.loads(body)["running"] is True
     assert len(console.procs) == 1
     assert json.loads(_call(console, "/api/jobs/current")[1])["task_id"] == "refuse_x"
+
+
+def test_a_browser_start_with_the_local_origin_is_accepted(console):
+    origin = f"http://127.0.0.1:{console.server_address[1]}"
+    headers = {"X-Console-Token": console.token, "Origin": origin, "Content-Type": "application/json"}
+    body = {"task_id": "refuse_x", "instance": "suryodaya", "confirm": "suryodaya/refuse_x"}
+
+    assert _call(console, "/api/jobs", body, headers)[0] == 200
+    assert len(console.procs) == 1

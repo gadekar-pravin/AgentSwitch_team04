@@ -134,6 +134,7 @@ database, the write ordering, interference and cleanup). It also browses past ru
   lives in the console's memory and shared fixture rows would collide.
 - Never restart the console while a run is in progress. The run keeps going, but the new console forgets it;
   wait for the log in `runs/demo/` to end.
+- If you refresh the page just as a run finishes, the live view is not re-attached; the run is under **Demo runs** in Past runs.
 - Check provider, model and date without showing `.env` on screen (`.env` beats exported variables):
   `grep -E '^(LLM_PROVIDER|OPENAI_MODEL|OPENROUTER_MODEL|AGENT_TODAY)=' .env`. The trace's `start` event shows
   the provider and model actually used.

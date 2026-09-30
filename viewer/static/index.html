@@ -224,8 +224,9 @@ async function poll() {
     setTimeout(poll, 1000);
     return;
   }
+  const logFile = job ? job.log.split(/[\\/]/).pop() : "";
   $("job").textContent = !job ? "" : `${job.task_id} on ${job.instance}: `
-    + (job.running ? "running" : `finished, exit ${job.exit_code}`) + `  (log: ${job.log})`;
+    + (job.running ? "running" : `finished, exit ${job.exit_code}`) + `  (log: ${logFile})`;
   const f = follow;
   $("follow").hidden = !(job && job.running && !(f && f.jobId === job.job_id));
   if (f && job && f.jobId === job.job_id) {
@@ -247,7 +248,8 @@ async function poll() {
       // never got that far, and the only record of why is the console log.
       else if (!job.running && f === follow) {
         follow = null;
-        $("verdict").replaceChildren(el("p", "error", `The run ended without a task directory. See ${job.log}`));
+        const logFile = job.log.split(/[\\/]/).pop();
+        $("verdict").replaceChildren(el("p", "error", `The run ended without a task directory. See runs/demo/${logFile}`));
       }
     }
   }
