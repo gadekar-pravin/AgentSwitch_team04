@@ -42,6 +42,7 @@ details pre { white-space: pre-wrap; word-break: break-word; margin: 4px 0 0; }
       <label class="muted">Type <code id="confirm-hint"></code> to confirm. This writes to the live tenant.
         <input id="confirm" autocomplete="off"></label>
       <button id="start">Start run</button>
+      <p id="start-error" class="error"></p>
       <p id="job" class="muted"></p>
       <button id="follow" hidden>Follow current run</button>
     </section>
@@ -188,6 +189,8 @@ function attach(job) {
   $("detail-title").textContent = `live: ${job.instance} / ${job.task_id}`;
 }
 async function start() {
+  const mine = view;
+  $("start-error").textContent = "";
   const body = {task_id: $("task").value, instance: $("instance").value, confirm: $("confirm").value};
   let r, data;
   try {
@@ -195,17 +198,18 @@ async function start() {
       headers: {"Content-Type": "application/json", "X-Console-Token": TOKEN}});
     data = await r.json();
   } catch (e) {
-    $("job").textContent = `Could not reach the console server: ${e.message}`;
+    $("start-error").textContent = `Could not reach the console server: ${e.message}`;
     return;
   }
-  if (!r.ok) { $("job").textContent = `Refused: ${data.error}`; return; }
+  if (!r.ok) { $("start-error").textContent = `Refused: ${data.error}`; return; }
   $("confirm").value = "";
-  attach(data);
+  if (mine === view) attach(data);
 }
 async function followCurrent() {
+  const mine = view;
   try {
     const job = await get("/api/jobs/current");
-    if (job && job.running) attach(job);
+    if (mine === view && job && job.running) attach(job);
   } catch (e) {
     setConn(false);
   }
