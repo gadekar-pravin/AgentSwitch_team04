@@ -592,7 +592,7 @@ function sheet(headers, rows) {
 }
 const SHOWN = new Set(["outcome", "work_order", "is_late", "currency", "blocking_causes", "contributing_causes",
   "evidence_records", "potentially_blocked_work_orders", "blocked_sales_orders", "rescheduled", "customer_impact",
-  "not_visible", "escalations", "refusal_reason", "cost"]);
+  "not_visible", "escalations", "refusal_reason", "cost", "feasibility"]);
 function renderFinding(f, run, final) {
   const box = $("finding");
   box.replaceChildren();
@@ -617,6 +617,13 @@ function renderFinding(f, run, final) {
     const c = el("div", "callout t-info");
     c.append(el("b", "", f.outcome === "refused" ? "Why it refused" : "What it could not do"), el("span", "", f.refusal_reason));
     box.append(c);
+  }
+  if (f.feasibility && typeof f.feasibility === "object") {
+    const fz = f.feasibility, hours = fz.remaining_work_content_hours;
+    const answer = el("span", "tick " + ({no: "t-bad", unknown: "t-warn"}[fz.verdict] || "t-plain"),
+                      `Finish by ${fz.asked_by || "?"}: ${fz.verdict || "not recorded"}`);
+    box.append(frow("Feasibility", answer,
+      el("span", "small", typeof hours === "number" ? `${hours} h of work remaining on open job cards` : "remaining work not recorded")));
   }
   if ((f.blocking_causes || []).length) box.append(frow("Blocking · stop", ...counted(f.blocking_causes, "stop")));
   if ((f.contributing_causes || []).length) box.append(frow("Contributing · warn", ...counted(f.contributing_causes, "warnd")));
