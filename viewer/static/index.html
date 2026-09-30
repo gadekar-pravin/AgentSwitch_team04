@@ -1,1 +1,272 @@
-<script>const TOKEN = "{{TOKEN}}";</script>
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>team04 run console</title>
+<style>
+:root { --bg: #fbfbfa; --fg: #1b1b1b; --muted: #6b6b6b; --line: #dcdcd8; --panel: #f2f2ef;
+        --ok: #1a7f4b; --bad: #b3261e; --tool: #8a5a00; --llm: #3e63c4; }
+@media (prefers-color-scheme: dark) {
+  :root { --bg: #151515; --fg: #ececec; --muted: #9b9b9b; --line: #333; --panel: #1e1e1e;
+          --ok: #5cc28b; --bad: #f28b82; --tool: #e0b04a; --llm: #8fa8ff; }
+}
+body { margin: 0; background: var(--bg); color: var(--fg); font: 15px/1.45 system-ui, sans-serif; }
+main { display: grid; grid-template-columns: 340px 1fr; gap: 16px; padding: 16px; max-width: 1400px; margin: auto; }
+section { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 12px; margin-bottom: 16px; }
+h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); margin: 0 0 8px; }
+select, input, button { font: inherit; width: 100%; margin: 4px 0; padding: 6px; box-sizing: border-box; }
+ul { list-style: none; padding-left: 0; } ul ul { padding-left: 12px; font-size: 13px; }
+ul ul li { cursor: pointer; }
+.muted { color: var(--muted); font-size: 13px; }
+.approve { color: var(--ok); } .revise, .unevaluated { color: var(--bad); }
+.ev { border-left: 3px solid var(--line); padding: 4px 8px; margin: 6px 0; white-space: pre-wrap;
+      word-break: break-word; font: 13px/1.4 ui-monospace, monospace; }
+.ev.llm { border-color: var(--llm); } .ev.tool { border-color: var(--tool); }
+.ev.end { border-color: var(--ok); } .ev.exception { border-color: var(--bad); }
+.error { color: var(--bad); white-space: pre-wrap; }
+details pre { white-space: pre-wrap; word-break: break-word; margin: 4px 0 0; }
+#conn { background: var(--bad); color: var(--bg); padding: 8px 16px; margin: 0; }
+@media (max-width: 800px) { main { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<p id="conn" hidden>Disconnected from the console server. Retrying every second.</p>
+<main>
+  <div>
+    <section>
+      <h2>Run a task live</h2>
+      <select id="task"></select>
+      <select id="instance"></select>
+      <p id="task-info" class="muted"></p>
+      <label class="muted">Type <code id="confirm-hint"></code> to confirm. This writes to the live tenant.
+        <input id="confirm" autocomplete="off"></label>
+      <button id="start">Start run</button>
+      <p id="job" class="muted"></p>
+      <button id="follow" hidden>Follow current run</button>
+    </section>
+    <section>
+      <h2>Past runs</h2>
+      <select id="base">
+        <option value="committed">Full runs (runs/)</option>
+        <option value="demo">Demo runs (runs/demo/)</option>
+      </select>
+      <ul id="runs"></ul>
+    </section>
+  </div>
+  <section>
+    <h2 id="detail-title">Select a run</h2>
+    <div id="verdict"></div>
+    <div id="events"></div>
+  </section>
+</main>
+<script>
+const TOKEN = "{{TOKEN}}";
+const $ = id => document.getElementById(id);
+let tasks = [];
+// Every change of what the detail pane shows replaces `follow` (or bumps `view` for history), and a response
+// is drawn only if its view is still the one on screen. Without this, a slow poll can paint a live run's
+// steps into a past run that was clicked meanwhile.
+let view = 0;
+let follow = null;  // {jobId, offset} while the detail pane follows a live run
+
+function el(tag, cls, text) {
+  const e = document.createElement(tag);
+  if (cls) e.className = cls;
+  if (text !== undefined) e.textContent = text;
+  return e;
+}
+async function get(url) {
+  const r = await fetch(url);  // a network failure throws a TypeError with no status
+  if (!r.ok) {
+    const err = new Error((await r.json().catch(() => ({}))).error || String(r.status));
+    err.status = r.status;
+    throw err;
+  }
+  return r.json();
+}
+const q = params => new URLSearchParams(params).toString();
+const parsed = s => { try { return JSON.parse(s); } catch { return s; } };
+
+function setConn(ok) {
+  $("conn").hidden = ok;
+}
+function details(label, value) {
+  const d = el("details");
+  d.append(el("summary", "", label), el("pre", "", JSON.stringify(value, null, 1)));
+  return d;
+}
+function eventNode(ev) {
+  const box = el("div", "ev " + ev.type);
+  if (ev.type === "start") {
+    box.append(el("div", "", `start  ${ev.instance}  ${ev.provider || ""} ${ev.model}\n${ev.request}`));
+  } else if (ev.type === "llm") {
+    box.append(el("div", "", ev.tool_calls.length
+      ? `step ${ev.step}  model calls: ${ev.tool_calls.map(c => c.name).join(", ")}`
+      : `step ${ev.step}  model answers:\n${ev.content || ""}`));
+  } else if (ev.type === "tool") {
+    box.append(el("div", ev.error ? "error" : "", `step ${ev.step}  ${ev.name}  ${ev.seconds}s`
+      + (ev.error ? `  ERROR ${ev.error}` : "")));
+    box.append(details("arguments", parsed(ev.arguments)), details("result", ev.result));
+  } else if (ev.type === "end") {
+    box.append(el("div", "", `end  ${ev.stop_reason}`));
+    if (ev.error) box.append(el("pre", "error", ev.error));
+    box.append(details("finding", ev.finding));
+  } else if (ev.type === "exception") {
+    box.append(el("pre", "error", `${ev.tool}: ${ev.traceback}`));
+  } else {
+    box.append(details(ev.type, ev));
+  }
+  return box;
+}
+function addEvents(events) {
+  for (const ev of events) $("events").append(eventNode(ev));
+}
+function showVerdict(run) {
+  const box = $("verdict"), v = run.verdict;
+  box.replaceChildren(el("p", v ? v.verdict : "unevaluated",
+    v ? `${v.verdict}: ${v.reason}` : "No verdict: not scored, never a pass."));
+  box.append(el("p", "muted", `result.json on disk before verdict.json: ${run.persisted_before_verdict ?? "n/a"}`));
+  // A setup failure (bad credentials, tenant down) still exits 0; its cause is only in result.error.
+  if (run.result && run.result.error) box.append(el("pre", "error", run.result.error));
+  if (run.cleanup && run.cleanup.errors && run.cleanup.errors.length) {
+    box.append(el("p", "error", "Cleanup errors: an escalation may still be open. Check it by hand."));
+  }
+  for (const k of ["interference", "cleanup"]) {
+    if (run[k]) box.append(details(k, run[k]));
+  }
+}
+async function showRun(base, root, instance, task) {
+  follow = null;
+  const mine = ++view;
+  try {
+    const run = await get("/api/run?" + q({base, root, instance, task}));
+    if (mine !== view) return;
+    $("detail-title").textContent = `${root} / ${instance} / ${task}`;
+    $("events").replaceChildren();
+    addEvents(run.trace);
+    showVerdict(run);
+  } catch (e) {
+    if (mine === view) $("verdict").replaceChildren(el("p", "error", `Could not load this run: ${e.message}`));
+  }
+}
+async function loadRuns() {
+  const base = $("base").value, list = $("runs");
+  let roots;
+  try {
+    roots = await get("/api/runs?" + q({base}));
+  } catch (e) {
+    list.replaceChildren(el("li", "error", `Could not list runs: ${e.message}`));
+    return;
+  }
+  list.replaceChildren();
+  for (const r of roots) {
+    const li = el("li", "", r.complete ? `${r.name}  ${r.approved}/${r.scored_total} approved` : `${r.name}  incomplete`);
+    const ul = el("ul");
+    for (const t of r.tasks) {
+      const item = el("li", t.verdict || "unevaluated", `${t.verdict || "no verdict"}  ${t.instance}  ${t.task_id}`);
+      item.onclick = () => showRun(base, r.name, t.instance, t.task_id);
+      ul.append(item);
+    }
+    li.append(ul);
+    list.append(li);
+  }
+}
+function updateHint() { $("confirm-hint").textContent = `${$("instance").value}/${$("task").value}`; }
+function fillInstances() {
+  const t = tasks.find(t => t.id === $("task").value);
+  $("instance").replaceChildren(...t.instances.map(i => el("option", "", i)));
+  $("task-info").textContent = `mode ${t.mode || "dry_run"}` + (t.fixture ? ", writes fixture work orders" : "")
+    + (t.escalate ? ", may escalate (withdrawn after scoring)" : "");
+  updateHint();
+}
+function attach(job) {
+  ++view;
+  follow = {jobId: job.job_id, offset: 0};
+  $("events").replaceChildren();
+  $("verdict").replaceChildren();
+  $("detail-title").textContent = `live: ${job.instance} / ${job.task_id}`;
+}
+async function start() {
+  const body = {task_id: $("task").value, instance: $("instance").value, confirm: $("confirm").value};
+  let r, data;
+  try {
+    r = await fetch("/api/jobs", {method: "POST", body: JSON.stringify(body),
+      headers: {"Content-Type": "application/json", "X-Console-Token": TOKEN}});
+    data = await r.json();
+  } catch (e) {
+    $("job").textContent = `Could not reach the console server: ${e.message}`;
+    return;
+  }
+  if (!r.ok) { $("job").textContent = `Refused: ${data.error}`; return; }
+  $("confirm").value = "";
+  attach(data);
+}
+async function followCurrent() {
+  try {
+    const job = await get("/api/jobs/current");
+    if (job && job.running) attach(job);
+  } catch (e) {
+    setConn(false);
+  }
+}
+async function poll() {
+  let job;
+  try {
+    job = await get("/api/jobs/current");
+    setConn(true);
+  } catch (e) {
+    setConn(false);
+    setTimeout(poll, 1000);
+    return;
+  }
+  $("job").textContent = !job ? "" : `${job.task_id} on ${job.instance}: `
+    + (job.running ? "running" : `finished, exit ${job.exit_code}`) + `  (log: ${job.log})`;
+  const f = follow;
+  $("follow").hidden = !(job && job.running && !(f && f.jobId === job.job_id));
+  if (f && job && f.jobId === job.job_id) {
+    // Status first, then the trace: once the job reads as finished, the trace read after it is complete.
+    const where = {base: "demo", root: job.run_root || "", instance: job.instance, task: job.task_id};
+    try {
+      const t = await get("/api/trace?" + q({...where, offset: f.offset}));
+      if (f === follow) {
+        addEvents(t.events);
+        f.offset = t.offset;
+        if (!job.running) {
+          const run = await get("/api/run?" + q(where));
+          if (f === follow) { follow = null; showVerdict(run); loadRuns(); }
+        }
+      }
+    } catch (e) {
+      if (!e.status) setConn(false);
+      // A 404 is expected until the harness creates the task directory. Once the job has ended it means the run
+      // never got that far, and the only record of why is the console log.
+      else if (!job.running && f === follow) {
+        follow = null;
+        $("verdict").replaceChildren(el("p", "error", `The run ended without a task directory. See ${job.log}`));
+      }
+    }
+  }
+  setTimeout(poll, 1000);
+}
+(async () => {
+  $("task").onchange = fillInstances;
+  $("instance").onchange = updateHint;
+  $("start").onclick = start;
+  $("follow").onclick = followCurrent;
+  $("base").onchange = loadRuns;
+  try {
+    tasks = await get("/api/tasks");
+  } catch (e) {
+    setConn(false);
+    return;
+  }
+  $("task").replaceChildren(...tasks.map(t => el("option", "", t.id)));
+  fillInstances();
+  loadRuns();
+  await followCurrent();  // a refresh during a run picks the live view back up
+  poll();
+})();
+</script>
+</body>
+</html>
