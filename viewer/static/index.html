@@ -895,6 +895,17 @@ function fillInstances() {
   }));
   updateHint();
 }
+// The last task and instance picked survive a refresh; this browser only, and a stale choice falls back quietly.
+function rememberDispatch() {
+  try { localStorage.setItem("console-dispatch", JSON.stringify({task: $("task").value, instance: $("instance").value})); } catch {}
+}
+function restoreDispatch() {
+  let saved = null;
+  try { saved = JSON.parse(localStorage.getItem("console-dispatch")); } catch {}
+  if (saved && own(taskById, saved.task)) $("task").value = saved.task;
+  fillInstances();
+  if (saved && taskById[$("task").value].instances.includes(saved.instance)) { $("instance").value = saved.instance; updateHint(); }
+}
 function attach(job) {
   ++view;
   follow = {jobId: job.job_id, offset: 0};
@@ -1012,8 +1023,8 @@ $("day").onclick = () => setTheme(false);
 $("night").onclick = () => setTheme(true);
 
 (async () => {
-  $("task").onchange = fillInstances;
-  $("instance").onchange = () => { updateHint(); if (!pane) setTenant($("instance").value); };
+  $("task").onchange = () => { fillInstances(); rememberDispatch(); };
+  $("instance").onchange = () => { updateHint(); rememberDispatch(); if (!pane) setTenant($("instance").value); };
   $("start").onclick = start;
   $("follow").onclick = followCurrent;
   $("live-pill").onclick = followCurrent;
@@ -1027,7 +1038,7 @@ $("night").onclick = () => setTheme(true);
   taskById = Object.fromEntries(tasks.map(t => [t.id, t]));
   instances = [...new Set(tasks.flatMap(t => t.instances))].sort();
   $("task").replaceChildren(...tasks.map(t => { const o = el("option", "", human(t.id)); o.value = t.id; return o; }));
-  fillInstances();
+  restoreDispatch();
   setTenant($("instance").value);
   loadRuns();
   await followCurrent();  // a refresh during a run picks the live view back up
