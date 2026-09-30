@@ -119,7 +119,9 @@ def test_task_run_reports_the_same_write_ordering_the_checker_requires(tmp_path)
     assert runs.load_task_run(d)["persisted_before_verdict"] is False
 
 
-TASKS = [{"id": "refuse_x", "instances": ["keystone", "suryodaya"]}, {"id": "why_late", "instances": ["suryodaya"]}]
+TASKS = [{"id": "refuse_x", "instances": ["keystone", "suryodaya"], "prompt": "Cancel WO-1.",
+          "checks": "Refuses; no write."},
+         {"id": "why_late", "instances": ["suryodaya"]}]
 
 
 def fake_popen(procs):
@@ -238,7 +240,7 @@ def test_task_list_carries_what_each_task_tests(console):
     [task] = [t for t in json.loads(_call(console, "/api/tasks")[1]) if t["id"] == "refuse_x"]
 
     # The page shows these before a live run starts; for past runs it reads them from task.json instead.
-    assert {"prompt", "checks"} <= task.keys()
+    assert (task["prompt"], task["checks"]) == ("Cancel WO-1.", "Refuses; no write.")
     assert task["instances"] == ["keystone", "suryodaya"]
 
 

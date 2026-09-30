@@ -14,15 +14,14 @@
   --display: "Avenir Next Condensed", "Roboto Condensed", "Arial Narrow", sans-serif-condensed, sans-serif;
   --body: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
-  color-scheme: light dark;
+  color-scheme: light;
 }
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #11151b; --card: #19202a; --soft: #1f2630; --ink: #e6eaf0; --muted: #9aa4b2; --line: #2c3440;
-    --accent: #8fb0ff; --accent-tint: #1c2a45;
-    --ok: #6fd3a0; --ok-tint: #143020; --bad: #ff9aa4; --bad-tint: #3a171b; --warn: #f2c46b; --warn-tint: #392b10;
-    --tag: #29251a; --tag-ink: #f1e6c4; --tag-line: #4d4429; --shadow: none;
-  }
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #11151b; --card: #19202a; --soft: #1f2630; --ink: #e6eaf0; --muted: #9aa4b2; --line: #2c3440;
+  --accent: #8fb0ff; --accent-tint: #1c2a45;
+  --ok: #6fd3a0; --ok-tint: #143020; --bad: #ff9aa4; --bad-tint: #3a171b; --warn: #f2c46b; --warn-tint: #392b10;
+  --tag: #29251a; --tag-ink: #f1e6c4; --tag-line: #4d4429; --shadow: none;
 }
 * { box-sizing: border-box; }
 body { margin: 0; background: var(--bg); color: var(--ink); font: 16px/1.5 var(--body); }
@@ -53,7 +52,9 @@ main { display: grid; grid-template-columns: 340px minmax(0, 1fr); gap: 20px; ma
 .clamp { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
 .muted { color: var(--muted); } .small { font-size: 14px; }
 button.primary { width: 100%; height: 44px; border: 0; border-radius: 8px; background: var(--accent); color: #fff; font-weight: 600; cursor: pointer; }
-@media (prefers-color-scheme: dark) { button.primary { color: #0d1526; } }
+:root[data-theme="dark"] button.primary { color: #0d1526; }
+.theme { border: 1px solid var(--line); background: var(--card); border-radius: 999px; padding: 6px 14px; font-size: 14px; cursor: pointer; }
+.top-right { display: flex; align-items: center; gap: 10px; }
 button.secondary { width: 100%; height: 40px; margin-top: 8px; border: 1px solid var(--accent); border-radius: 8px; background: none; color: var(--accent); cursor: pointer; }
 .error { color: var(--bad); white-space: pre-wrap; }
 p.error:empty { display: none; }
@@ -169,7 +170,10 @@ h3.sub { margin: 10px 0 0; font-size: 12px; text-transform: uppercase; letter-sp
 <p id="conn" hidden>Disconnected from the console server. Retrying every second.</p>
 <header class="top">
   <div class="brand">team04 <span>· run console</span></div>
-  <button id="live-pill" class="pill running" hidden><span class="dot"></span><span id="live-text"></span></button>
+  <div class="top-right">
+    <button id="live-pill" class="pill running" hidden><span class="dot"></span><span id="live-text"></span></button>
+    <button id="theme" class="theme" aria-pressed="false">Dark mode</button>
+  </div>
 </header>
 <main>
   <aside class="rail">
@@ -253,7 +257,8 @@ const LABELS = {
   applied: "Applied", not_approved: "Not approved", not_writable: "Not writable", write_rejected: "Write rejected",
   write_not_persisted: "Write not persisted", dry_run: "Dry run", apply: "Applies changes",
 };
-const human = code => LABELS[code] || String(code).replace(/_/g, " ").replace(/\b(wo|so|eco|sco)(\d+)\b/gi,
+const own = (o, k) => Object.hasOwn(o, k) ? o[k] : undefined;
+const human = code => own(LABELS, code) || String(code).replace(/_/g, " ").replace(/\b(wo|so|eco|sco)(\d+)\b/gi,
   (m, p, n) => p.toUpperCase() + n).replace(/^./, c => c.toUpperCase());
 const TONE = {answered: "t-ok", applied: "t-ok", partial: "t-warn", changed_underneath: "t-warn", refused: "t-info",
               not_approved: "t-info", approve: "t-ok", revise: "t-bad", unevaluated: "t-warn"};
@@ -262,7 +267,7 @@ function chip(text, cls, title) {
   if (title) c.title = title;
   return c;
 }
-function codeChip(code) { return chip(human(code), TONE[code] || "", String(code)); }
+function codeChip(code) { return chip(human(code), own(TONE, code) || "", String(code)); }
 function idChips(list, limit) {
   const box = el("div", "badges");
   for (const id of list.slice(0, limit)) box.append(chip(id, "mono"));
@@ -323,11 +328,18 @@ function renderTag(state) {
   } else {
     const v = state.run.verdict;
     const word = v ? v.verdict : "unevaluated";
-    tag.append(el("span", "stamp " + (TONE[word] ? word : "unevaluated"),
+    tag.append(el("span", "stamp " + (own(TONE, word) ? word : "unevaluated"),
       {approve: "Approved", revise: "Revise", unevaluated: "Unevaluated"}[word] || word));
     tag.append(el("p", "reason", v ? v.reason : "No verdict: not scored, never a pass."));
     // A setup failure (bad credentials, tenant down) still exits 0; its cause is only in result.error.
     if (state.run.result && state.run.result.error) tag.append(el("pre", "error", state.run.result.error));
+    const cleanupErrors = (state.run.cleanup && state.run.cleanup.errors) || [];
+    if (cleanupErrors.length) {
+      const c = el("div", "callout t-bad");
+      c.append(el("b", "", "Cleanup errors: an escalation may still be open. Check it by hand."),
+               el("pre", "", cleanupErrors.join("\n")));
+      tag.append(c);
+    }
     const saved = state.run.persisted_before_verdict;
     tag.append(el("p", "foot", saved === true ? "✓ Result saved before scoring · graded from the database, not the reply"
       : saved === false ? "✕ Result written after the verdict" : "Graded from the database, not the reply"));
@@ -374,6 +386,7 @@ function renderFinding(f, run, final) {
     box.append(el("p", final ? "callout t-warn" : "muted",
       final ? "No finding recorded. The verifier grades the stored finding, so this run cannot pass."
             : "The finding appears here when the agent records it."));
+    if (run && run.interference) box.append(frow("Interference", details("Another edit injected mid-run", run.interference)));
     return;
   }
   h.append(codeChip(f.outcome));
@@ -417,25 +430,20 @@ function renderFinding(f, run, final) {
     box.append(frow("Rescheduling", t));
   }
   const raised = (run && run.result && run.result.escalations) || [];
-  const esc = (f.escalations || []).length ? f.escalations : raised;
+  const numbers = new Set(raised.map(r => r.number).filter(Boolean));
+  const esc = [...raised, ...(f.escalations || []).filter(e => !e.number || !numbers.has(e.number))];
   if (esc.length) {
     const list = el("div");
     const withdrawn = new Set((run && run.cleanup && run.cleanup.withdrawn) || []);
     for (const e of esc) {
-      const full = raised.find(r => r.number && r.number === e.number) || {};
+      const coded = (f.escalations || []).find(x => x.number && x.number === e.number) || {};
       const line = el("div", "badges");
-      line.append(chip(e.number || "not raised", "mono"));
-      if (e.assignee || full.assignee) line.append(chip(e.assignee || full.assignee));
-      if (e.reason_code) line.append(codeChip(e.reason_code));
+      line.append(chip(e.raised === false ? "Not raised" : (e.number || "No number"), "mono"));
+      if (e.assignee) line.append(chip(e.assignee));
+      if (e.reason_code || coded.reason_code) line.append(codeChip(e.reason_code || coded.reason_code));
       if (withdrawn.has(e.number)) line.append(chip("Withdrawn after scoring", "t-ok"));
       else if (e.raised && run && run.cleanup) line.append(chip("Still open", "t-warn"));
       list.append(line);
-    }
-    if (run && run.cleanup && (run.cleanup.errors || []).length) {
-      const c = el("div", "callout t-bad");
-      c.append(el("b", "", "Cleanup errors: an escalation may still be open. Check it by hand."),
-               el("pre", "", run.cleanup.errors.join("\n")));
-      list.append(c);
     }
     box.append(frow("Escalations", list));
   }
@@ -492,9 +500,13 @@ function toolRow(ev) {
   const res = ev.result && typeof ev.result === "object" ? ev.result : null;
   if (ev.error) head.append(chip("Error", "t-bad"));
   else if (res && typeof res.outcome === "string") head.append(codeChip(res.outcome));
-  head.append(el("span", "secs", ev.seconds !== undefined ? `${ev.seconds} s` : ""));
+  head.append(el("span", "secs", typeof ev.seconds === "number" ? `${ev.seconds} s` : ""));
   row.append(head);
-  if (ev.error) { row.open = true; row.append(el("p", "error small", String(ev.error))); }
+  if (ev.error) {
+    row.open = true;
+    const detail = res && typeof res.error === "string" && res.error !== ev.error ? `: ${res.error}` : "";
+    row.append(el("p", "error small", String(ev.error) + detail));
+  }
   const body = el("div", "toolrow-body");
   body.append(el("p", "small muted", `Tool ${ev.name}`), el("h3", "sub", "Arguments"), el("pre", "", JSON.stringify(args, null, 1)),
               el("h3", "sub", "Result"), el("pre", "", JSON.stringify(ev.result, null, 1)));
@@ -537,6 +549,7 @@ function addEvent(ev) {
     card.head.append(chip(`Stopped: ${human(ev.stop_reason)}`, ev.stop_reason === "final_answer" ? "" : "t-warn"));
     if (ev.error) { const c = callout(card, "t-bad", "The model call failed"); c.append(el("pre", "", ev.error)); }
     renderFinding(ev.finding, null, true);
+    if (pane.live) renderTag({kind: "awaiting"});
   } else {
     stepCard().rows.append(details(human(ev.type), ev));
   }
@@ -637,7 +650,7 @@ function renderGrid() {
       const b = el("button", "cell");
       if (got.has(key)) {
         const v = got.get(key) || "unevaluated";
-        b.className = "cell " + (TONE[v] ? v : "unevaluated");
+        b.className = "cell " + (own(TONE, v) ? v : "unevaluated");
         b.textContent = {approve: "✓", revise: "✕"}[v] || "?";
         b.setAttribute("aria-label", `${human(id)} on ${c}: ${got.get(key) || "no verdict"}`);
         b.dataset.key = `${base}|${r.name}|${c}|${id}`;
@@ -741,9 +754,17 @@ async function poll() {
         addEvents(t.events);
         f.offset = t.offset;
         if (!job.running) {
-          if (f === follow) renderTag({kind: "awaiting"});
-          const run = await get("/api/run?" + q(where));
-          if (f === follow) { follow = null; showResult(run); loadRuns(`demo|${job.run_root}`); }
+          renderTag({kind: "awaiting"});
+          let run = null;
+          try { run = await get("/api/run?" + q(where)); } catch (e) {
+            if (f === follow) { follow = null; pane.live = false; renderTag({kind: "lost", message: `Could not load this run: ${e.message}`}); }
+          }
+          if (run && f === follow) {
+            follow = null;
+            selected = `demo|${job.run_root}|${job.instance}|${job.task_id}`;
+            showResult(run);
+            loadRuns(`demo|${job.run_root}`);
+          }
         }
       }
     } catch (e) {
@@ -752,6 +773,7 @@ async function poll() {
       // never got that far, and the only record of why is the console log.
       else if (!job.running && f === follow) {
         follow = null;
+        pane.live = false;
         const logFile = job.log.split(/[\\/]/).pop();
         renderTag({kind: "lost", message: `The run ended without a task directory. See runs/demo/${logFile}`});
       }
@@ -760,6 +782,15 @@ async function poll() {
   setTimeout(poll, 1000);
 }
 setInterval(() => { if (lastJob && lastJob.running) { renderJob(lastJob); renderStats(); } }, 1000);
+
+function setTheme(dark) {
+  document.documentElement.dataset.theme = dark ? "dark" : "light";
+  $("theme").textContent = dark ? "Light mode" : "Dark mode";
+  $("theme").setAttribute("aria-pressed", String(dark));
+  try { localStorage.setItem("console-theme", dark ? "dark" : "light"); } catch {}
+}
+(() => { let saved = null; try { saved = localStorage.getItem("console-theme"); } catch {} setTheme(saved === "dark"); })();
+$("theme").onclick = () => setTheme(document.documentElement.dataset.theme !== "dark");
 
 (async () => {
   $("task").onchange = fillInstances;
