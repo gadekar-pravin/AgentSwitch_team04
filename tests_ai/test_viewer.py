@@ -5,10 +5,15 @@ The graded, hand-written tests live in tests/.
 """
 import json
 import os
+import sys
+from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
+from prod_agent import config
 from viewer import runs
+from viewer.jobs import JobError, JobRunner
 
 ROOT = "20260930-101500-000001"
 
@@ -108,3 +113,72 @@ def test_task_run_reports_the_same_write_ordering_the_checker_requires(tmp_path)
 
     os.utime(d / "result.json", (3000, 3000))
     assert runs.load_task_run(d)["persisted_before_verdict"] is False
+
+
+TASKS = [{"id": "refuse_x", "instances": ["keystone", "suryodaya"]}, {"id": "why_late", "instances": ["suryodaya"]}]
+
+
+def fake_popen(procs):
+    """Stands in for subprocess.Popen: records the call and creates the run root the real runner would."""
+    def popen(cmd, **kwargs):
+        proc = SimpleNamespace(cmd=cmd, kwargs=kwargs, code=None)
+        proc.poll = lambda: proc.code
+        Path(cmd[cmd.index("--runs-dir") + 1], f"20260930-12000{len(procs)}-000001").mkdir()
+        procs.append(proc)
+        return proc
+    return popen
+
+
+def test_start_runs_the_harness_cli_into_the_demo_directory(tmp_path):
+    procs, demo = [], tmp_path / "demo"
+    jobs = JobRunner(TASKS, demo, popen=fake_popen(procs))
+
+    status = jobs.start("refuse_x", "keystone", "keystone/refuse_x")
+
+    [proc] = procs
+    assert proc.cmd == [sys.executable, "-m", "harness.runner", "--task", "refuse_x", "--instance", "keystone",
+                        "--runs-dir", str(demo)]
+    assert proc.kwargs["cwd"] == config.ROOT
+    assert proc.kwargs["start_new_session"] is True
+    assert status["running"] is True
+    assert status["run_root"] == "20260930-120000-000001"
+
+
+@pytest.mark.parametrize("task,instance,confirm", [
+    ("not_a_task", "suryodaya", "suryodaya/not_a_task"),
+    ("why_late", "keystone", "keystone/why_late"),
+    ("refuse_x", "suryodaya", "yes"),
+    ("refuse_x", "suryodaya", ""),
+])
+def test_start_refuses_anything_not_on_the_allowlist_or_not_confirmed(tmp_path, task, instance, confirm):
+    procs = []
+    jobs = JobRunner(TASKS, tmp_path / "demo", popen=fake_popen(procs))
+
+    with pytest.raises(JobError):
+        jobs.start(task, instance, confirm)
+    assert procs == []
+
+
+def test_only_one_run_at_a_time(tmp_path):
+    procs = []
+    jobs = JobRunner(TASKS, tmp_path / "demo", popen=fake_popen(procs))
+    jobs.start("refuse_x", "suryodaya", "suryodaya/refuse_x")
+
+    with pytest.raises(JobError, match="in progress"):
+        jobs.start("why_late", "suryodaya", "suryodaya/why_late")
+
+    procs[0].code = 0
+    assert jobs.status()["exit_code"] == 0
+    jobs.start("why_late", "suryodaya", "suryodaya/why_late")
+    assert len(procs) == 2
+    assert jobs.status()["run_root"] == "20260930-120001-000001"
+    assert jobs.status()["job_id"] == 2
+
+
+def test_no_status_before_any_run(tmp_path):
+    assert JobRunner(TASKS, tmp_path / "demo").status() is None
+
+
+def test_task_without_declared_instances_runs_on_every_instance(tmp_path):
+    jobs = JobRunner([{"id": "plain"}], tmp_path / "demo")
+    assert jobs.instances_for("plain") == sorted(config.INSTANCES)
