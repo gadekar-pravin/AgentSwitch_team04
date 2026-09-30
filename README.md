@@ -109,6 +109,42 @@ python -m harness.runner --include-samples
 
 Output goes to `runs/<timestamp>/<instance>/<task>/`: `task.json`, `fixture.json`, `trace.jsonl` (written event by event), and `result.json`, all fsync'd **before** the verifier writes `verdict.json`. Verdicts are `approve`, `revise` or `unevaluated`, and unevaluated never counts as a pass. See [harness/tasks/README.md](harness/tasks/README.md) for the task and verifier format.
 
+## Live run console
+
+```bash
+python -m viewer            # http://127.0.0.1:8765
+```
+
+A local page for the screen-shared live demo. Pick a harness task and an instance, type the confirmation it
+asks for, and watch the agent's steps arrive, then the verdict and the evidence behind it (the finding in the
+database, the write ordering, interference and cleanup). It also browses past runs.
+
+- It starts the same command you would type: `python -m harness.runner --task <id> --instance <name>
+  --runs-dir runs/demo`. Every click is a live run against a shared tenant.
+- Demo runs land in `runs/demo/`, never `runs/2026*`, so a partial run cannot become the run
+  `scripts/verify_submission.py` grades.
+- One run at a time, only tasks from `harness/tasks/team04/`, no `--apply`/`--escalate` outside what a task
+  declares.
+- There is no stop button: a killed run skips the escalation withdrawal. Ctrl-C stops the page, not the run.
+- Localhost only. It is not built to be shared or hosted.
+
+**Before the demo**
+
+- One console process only, and no `python -m harness.runner` from a terminal while it runs: the one-run guard
+  lives in the console's memory and shared fixture rows would collide.
+- Never restart the console while a run is in progress. The run keeps going, but the new console forgets it;
+  wait for the log in `runs/demo/` to end.
+- Check provider, model and date without showing `.env` on screen (`.env` beats exported variables):
+  `grep -E '^(LLM_PROVIDER|OPENAI_MODEL|OPENROUTER_MODEL|AGENT_TODAY)=' .env`. The trace's `start` event shows
+  the provider and model actually used.
+- After an escalation task, read the `cleanup` block. A failed withdrawal does not change the verdict, so the
+  page flags it; withdraw that escalation by hand.
+
+**Demo order** (agent time from the 17 Sep run): `refuse_unknown_work_order` on keystone (~15 s) →
+`why_late_wo48_subcontract` (~70 s) → `concurrent_edit_before_write` (~100 s; writes fixture rows, escalation
+withdrawn after scoring). Show `escalate_blocked_wo48` (~190 s) from past runs instead of live. If a tenant is
+down, walk through `runs/20260917-110938` in the same page.
+
 ## Layout
 
 | path | what |
@@ -117,6 +153,7 @@ Output goes to `runs/<timestamp>/<instance>/<task>/`: `task.json`, `fixture.json
 | `prod_agent/domain.py` | deterministic logic: `diagnose`, `downstream_impact`, `propose_reschedule`, `apply_proposal`, `record_finding` |
 | `prod_agent/agent.py` | the loop, tool specs and system prompt |
 | `harness/` | runner, verifier context, fixtures, task set |
+| `viewer/` | local live-run console (python -m viewer) |
 | `tests/` | hand-written tests only |
 | `GAP_REPORT.md` | week-one gap report (benchmark: Carbon) |
 | `docs/ARCHITECTURE.md` | how the agent and harness fit together, and where to change things |
