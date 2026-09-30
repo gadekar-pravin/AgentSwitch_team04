@@ -785,6 +785,12 @@ function addEvent(ev) {
     card.calls++;
     card.rows.append(toolRow(ev));
     nameOp(card);
+  } else if (ev.type === "finding_missing") {
+    const card = stepCard(ev.step);
+    card.final = false;
+    card.li.classList.remove("final");
+    card.head.querySelector(".tick.t-ok")?.remove();
+    card.head.append(el("span", "tick t-warn", "Replied before recording a finding"));
   } else if (ev.type === "wrap_up") {
     stepCard(ev.step).head.append(el("span", "tick t-warn", "Forced to record a finding"));
   } else if (ev.type === "approval") {

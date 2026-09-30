@@ -133,7 +133,7 @@ class ProductionAgent:
                  apply_mode: bool = False, approve: Callable[[dict], bool] | None = None,
                  allowed_write_ids: set[str] | None = None, trace: Callable[[dict], None] | None = None,
                  max_steps: int = 20, llm=None, escalate_mode: bool = False, session_title: str | None = None,
-                 max_escalations: int = 1):
+                 max_escalations: int = 1, require_finding: bool = False):
         self.mcp = mcp
         self.provider = (config.env("LLM_PROVIDER", "openai") or "openai").strip().lower()
         if self.provider == "openai":
@@ -163,6 +163,10 @@ class ProductionAgent:
         self._seen_calls: dict[tuple[str, str], int] = {}
         self.requested_orders: set[str] = set()  # WO numbers named in the request
         self.missing_orders: set[str] = set()  # refs a work-order tool reported as not found
+        # Off by default so the bare loop still stops on the first final answer; the harness and the CLI turn it
+        # on, because a run with no finding records nothing a verifier or a planner can use.
+        self.require_finding = require_finding
+        self._finding_demanded = False  # the model tried to finish without a finding and was sent back once
         # Reads REPEAT_GUARDED already promises are "still current" for the rest of the run, kept so
         # propose_reschedule does not re-run a diagnosis and a BOM walk the model has already paid for.
         self._reads: dict[tuple[str, str], dict] = {}
@@ -244,7 +248,7 @@ class ProductionAgent:
         escalation_due = self.escalate_mode and self.needs_person and not self.escalations
         if escalation_due and remaining == 3:
             return {"type": "function", "function": {"name": "escalate"}}
-        if remaining <= 2:
+        if remaining <= 2 or self._finding_demanded:
             return {"type": "function", "function": {"name": "record_finding"}}
         return None
 
@@ -437,6 +441,17 @@ class ProductionAgent:
             self.trace(llm_event)
             messages.append(dumped_message)
             if not msg.tool_calls:
+                if (self.require_finding and self.finding is None and not self._finding_demanded
+                        and step < self.max_steps - 1):
+                    # Seen live 2026-09-30: a correct refusal ended the run with no finding, and verifiers grade
+                    # only the finding. Sent back once, with record_finding forced on the next step.
+                    self._finding_demanded = True
+                    self.trace({"type": "finding_missing", "step": step})
+                    messages.append({"role": "user", "content":
+                                     "[agent loop] You replied without calling record_finding. Call record_finding "
+                                     "now with the structured result (outcome refused if you refused), then give "
+                                     "your final answer again."})
+                    continue
                 final, stop_reason = msg.content, "final_answer"
                 break
             # The repeat guard stays serial and in order: its "already called at step N" answer depends on what

@@ -160,7 +160,7 @@ def run_one(task: dict, instance: str, root: Path) -> dict:
         agent = ProductionAgent(
             mcp, apply_mode=task.get("mode") == "apply", allowed_write_ids=write_ids, approve=approve,
             escalate_mode=bool(task.get("escalate")), session_title=f"{config.HARNESS_MARKER} task {task['id']}",
-            trace=trace, max_steps=task.get("max_steps", 20))
+            trace=trace, max_steps=task.get("max_steps", 20), require_finding=True)
         result = agent.run(prompt)
         trace_file.close()
     except Exception:

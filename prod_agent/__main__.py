@@ -35,7 +35,7 @@ def main():
         return input("Write this change? [y/N] ").strip().lower() == "y"
 
     agent = ProductionAgent(McpClient(Session(args.instance)), apply_mode=args.apply, escalate_mode=args.escalate,
-                            approve=approve, trace=trace)
+                            approve=approve, trace=trace, require_finding=True)
     out = agent.run(args.request)
     (run_dir / "result.json").write_text(json.dumps(out, indent=2, default=str), encoding="utf-8")
     print(out["final_answer"] or f"(no final answer: {out['stop_reason']})")
