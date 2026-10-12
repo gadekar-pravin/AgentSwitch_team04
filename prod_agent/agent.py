@@ -380,6 +380,7 @@ class ProductionAgent:
         # Reads REPEAT_GUARDED already promises are "still current" for the rest of the run, kept so
         # propose_reschedule does not re-run a diagnosis and a BOM walk the model has already paid for.
         self._reads: dict[tuple[str, str], dict] = {}
+        self._diagnoses: dict[str, dict] = {}  # by reference, number and id, upper-cased
         self.llm = llm if llm is not None else default_llm(self.provider)
 
     # ------------------------------------------------------------------ tools
@@ -526,6 +527,26 @@ class ProductionAgent:
         merged["rescheduled"] = truth + kept
         return merged
 
+    def _diagnose(self, ref):
+        """One diagnosis per order per run, found again by the reference used, the order's number or its id: the
+        model may diagnose by number and file its finding by id, or name the order in other case."""
+        diag = self._diagnosis_for(ref)
+        if diag is None:
+            diag = domain.diagnose(self.mcp, ref)
+        self._reads["diagnose", ref] = diag
+        if diag.get("found"):
+            wo = diag.get("work_order") or {}
+            for key in (ref, wo.get("number"), wo.get("id")):
+                if isinstance(key, str) and key.strip():
+                    self._diagnoses[key.strip().upper()] = diag
+        return diag
+
+    def _diagnosis_for(self, ref) -> dict | None:
+        found = self._reads.get(("diagnose", ref))
+        if found is None and isinstance(ref, str):
+            found = self._diagnoses.get(ref.strip().upper())
+        return found
+
     def _restore_causes(self, args: dict) -> dict:
         """Add back causes diagnose returned for this order that the model left out of its finding.
 
@@ -535,7 +556,15 @@ class ProductionAgent:
         already holds diagnose's result, so the model is not the source of which causes exist; it still
         decides blocking versus contributing for the ones it kept, and anything it added stays.
         """
-        diag = self._reads.get(("diagnose", args.get("work_order")))
+        ref = args.get("work_order")
+        diag = self._diagnosis_for(ref)
+        if diag is None and args.get("outcome") in ("answered", "partial") and isinstance(ref, str) and ref.strip():
+            # An answer about an order the run never diagnosed still carries what the database proves: on
+            # 2026-10-12 the model reached its finding through propose_reschedule alone, and recorded none.
+            try:
+                diag = self._diagnose(ref)
+            except Exception:  # a failed read must not cost the finding itself
+                return args
         if not isinstance(diag, dict) or not diag.get("found"):
             return args
         if any(args.get(k) is not None and not isinstance(args.get(k), list) for k in ("blocking_causes", "contributing_causes")):
@@ -586,14 +615,18 @@ class ProductionAgent:
             rows = domain.list_late_work_orders(self.mcp)
             return {"count": len(rows), "work_orders": rows[:40], "truncated": len(rows) > 40}
         if name == "diagnose_work_order":
-            self._reads["diagnose", ref] = result = domain.diagnose(self.mcp, ref)
-            return result
+            return self._diagnose(ref)
         if name == "downstream_impact":
             self._reads["downstream", ref] = result = domain.downstream_impact(self.mcp, ref)
             return result
         if name == "propose_reschedule":
-            result = domain.propose_reschedule(self.mcp, ref, diag=self._reads.get(("diagnose", ref)),
-                                               down=self._reads.get(("downstream", ref)))
+            diag = self._diagnose(ref)
+            result = domain.propose_reschedule(self.mcp, ref, diag=diag, down=self._reads.get(("downstream", ref)))
+            if result.get("found") and diag.get("found"):
+                # Seen 2026-10-12 on the harness runner's model: asked to "find out why and reschedule", it went
+                # straight here, saw dates but no causes, and recorded WO-2026-00003 late with none at all.
+                found = dict.fromkeys((s["code"], s["blocking"]) for s in diag.get("signals") or [])
+                result = {**result, "causes_found": [{"code": code, "blocking": blocking} for code, blocking in found]}
             for p in result.get("proposals", []):
                 self._proposals[p["work_order_id"]] = p
                 if not p.get("writable_by_seat") and p["number"] == (result.get("work_order") or {}).get("number"):

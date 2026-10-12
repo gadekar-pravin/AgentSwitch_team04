@@ -394,7 +394,8 @@ def test_agent_does_not_reuse_a_read_for_a_different_work_order(monkeypatch):
     agent._dispatch("diagnose_work_order", {"work_order": "WO-1"})
     agent._dispatch("propose_reschedule", {"work_order": "WO-2"})
 
-    assert seen["diag"] is None, "a cached diagnosis leaked across work orders"
+    # propose_reschedule now always plans from a diagnosis (2026-10-12), but it must be WO-2's own.
+    assert seen["diag"] == {"found": True, "ref": "WO-2"}, "a cached diagnosis leaked across work orders"
 
 
 # --------------------------------------------------------------- 5. incomplete findings
