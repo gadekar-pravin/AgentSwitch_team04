@@ -381,6 +381,7 @@ class ProductionAgent:
         # propose_reschedule does not re-run a diagnosis and a BOM walk the model has already paid for.
         self._reads: dict[tuple[str, str], dict] = {}
         self._diagnoses: dict[str, dict] = {}  # by reference, number and id, upper-cased
+        self._missing: set[str] = set()  # references a lookup this run proved name no work order, upper-cased
         self.llm = llm if llm is not None else default_llm(self.provider)
 
     # ------------------------------------------------------------------ tools
@@ -539,7 +540,38 @@ class ProductionAgent:
             for key in (ref, wo.get("number"), wo.get("id")):
                 if isinstance(key, str) and key.strip():
                     self._diagnoses[key.strip().upper()] = diag
+        elif isinstance(ref, str) and ref.strip():
+            self._missing.add(ref.strip().upper())
         return diag
+
+    def _say_missing(self, ref, result):
+        """A lookup that found no such order says so in words the model takes as an instruction, not a fact to
+        dig past. Seen 2026-10-12 on both models: {"found": false} alone, and the model searched on for four or
+        five more steps, ran into its token limit, and filed the forced finding as answered."""
+        if not (isinstance(result, dict) and result.get("found") is False and isinstance(ref, str) and ref.strip()):
+            return result
+        self._missing.add(ref.strip().upper())
+        return {**result, "instruction_for_agent": (
+            f"{ref} does not exist on this instance: no work order has that number or id. Do not search for it "
+            f"another way. Call record_finding with outcome 'refused', work_order '{ref}', is_late null, no causes, "
+            "and a refusal_reason saying the work order does not exist.")}
+
+    def _refuse_missing_order(self, args: dict) -> dict:
+        """A finding about an order this run proved does not exist is a refusal, whatever outcome the model typed.
+
+        The backstop for _say_missing: on 2026-10-12 a forced finding at the token limit came back 'answered' for
+        WO-2026-09999. The lookups are the source of truth here, as the platform's write results are for
+        _reconcile_rescheduled; a refusal invents nothing, so causes, blocked orders and reschedules are cleared.
+        """
+        ref = args.get("work_order")
+        key = ref.strip().upper() if isinstance(ref, str) else ""
+        if not key or key not in self._missing or key in self._diagnoses or args.get("outcome") == "refused":
+            return args
+        self.trace({"type": "finding_corrected", "work_order": ref, "outcome_given": args.get("outcome"),
+                    "outcome_recorded": "refused", "why": "no work order with this reference exists"})
+        return {**args, "outcome": "refused", "is_late": None, "blocking_causes": [], "contributing_causes": [],
+                "potentially_blocked_work_orders": [], "blocked_sales_orders": [], "rescheduled": [],
+                "refusal_reason": args.get("refusal_reason") or f"{ref} does not exist on this instance"}
 
     def _diagnosis_for(self, ref) -> dict | None:
         found = self._reads.get(("diagnose", ref))
@@ -615,10 +647,10 @@ class ProductionAgent:
             rows = domain.list_late_work_orders(self.mcp)
             return {"count": len(rows), "work_orders": rows[:40], "truncated": len(rows) > 40}
         if name == "diagnose_work_order":
-            return self._diagnose(ref)
+            return self._say_missing(ref, self._diagnose(ref))
         if name == "downstream_impact":
             self._reads["downstream", ref] = result = domain.downstream_impact(self.mcp, ref)
-            return result
+            return self._say_missing(ref, result)
         if name == "propose_reschedule":
             diag = self._diagnose(ref)
             result = domain.propose_reschedule(self.mcp, ref, diag=diag, down=self._reads.get(("downstream", ref)))
@@ -627,6 +659,7 @@ class ProductionAgent:
                 # straight here, saw dates but no causes, and recorded WO-2026-00003 late with none at all.
                 found = dict.fromkeys((s["code"], s["blocking"]) for s in diag.get("signals") or [])
                 result = {**result, "causes_found": [{"code": code, "blocking": blocking} for code, blocking in found]}
+            result = self._say_missing(ref, result)
             for p in result.get("proposals", []):
                 self._proposals[p["work_order_id"]] = p
                 if not p.get("writable_by_seat") and p["number"] == (result.get("work_order") or {}).get("number"):
@@ -704,6 +737,7 @@ class ProductionAgent:
             args = self._restore_dropped(args)
             args = self._reconcile_rescheduled(args)
             args = self._restore_causes(args)
+            args = self._refuse_missing_order(args)
             mistyped = _mistyped(args)
             if mistyped:
                 # A wrong shape reaches the database and takes the verifier down with it, which scores
