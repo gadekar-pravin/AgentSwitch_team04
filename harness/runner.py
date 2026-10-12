@@ -28,11 +28,11 @@ from concurrent import futures
 from pathlib import Path
 
 from prod_agent import config, domain
-from prod_agent.agent import ProductionAgent, default_llm, probe_tool_choice
+from prod_agent.agent import NO_CREDIT, ProductionAgent, default_llm, probe_reasoning_off, probe_tool_choice
 from prod_agent.mcp_client import McpClient, RestClient, Session
 
 from .fixtures import FIXTURES, WRITING_FIXTURES, concurrent_edit
-from .results import RESULTS_NAME, ResultsBook
+from .results import RESULTS_NAME, ResultsBook, diagnostics
 from .verify import Verdict, VerifyContext, normalise
 
 TASK_DIR = Path(__file__).parent / "tasks"
@@ -47,6 +47,11 @@ TASK_SECONDS_DEFAULT = 240    # a task's own limit unless its json sets max_seco
 MIN_TASK_START_SECONDS = 90   # a task started with less than this left would only be cut off
 VERIFY_RESERVE_SECONDS = 30   # kept back from a task's limit for its verifier's reads
 WATCHDOG_GRACE_SECONDS = 90   # past the budget, end the process with results.json as it stands
+
+# The runner also gives each submission one LLM token budget shared by every instance it runs: 2026-10-12 spent
+# 304,284 tokens on Suryodaya's first three tasks and Keystone's first call was refused. A run therefore gets its own
+# share (--token-budget), and a task starts only when its whole limit still fits, so every listed task can finish.
+TASK_TOKENS_DEFAULT = 30_000  # a task's own token limit unless its json sets max_tokens
 
 PREFLIGHT_TITLE = "The harness reaches the instance (MCP and REST) and the model with the runner's credentials"
 
@@ -139,7 +144,8 @@ def persist_then_verify(run_dir: Path, result: dict, verify, *, catch: bool = Tr
 
 
 def run_one(task: dict, instance: str, root: Path, deadline: float | None = None,
-            forced_tool_choice: str = "named") -> dict:
+            forced_tool_choice: str = "named", token_budget: int | None = None,
+            request_extra: dict | None = None) -> dict:
     run_dir = root / instance / task["id"]
     run_dir.mkdir(parents=True, exist_ok=False)
     _write(run_dir / "task.json", task)
@@ -183,7 +189,7 @@ def run_one(task: dict, instance: str, root: Path, deadline: float | None = None
             mcp, apply_mode=task.get("mode") == "apply", allowed_write_ids=write_ids, approve=approve,
             escalate_mode=bool(task.get("escalate")), session_title=f"{config.HARNESS_MARKER} task {task['id']}",
             trace=trace, max_steps=task.get("max_steps", 20), deadline=deadline,
-            forced_tool_choice=forced_tool_choice)
+            forced_tool_choice=forced_tool_choice, token_budget=token_budget, request_extra=request_extra)
         result = agent.run(prompt)
         trace_file.close()
     except Exception:
@@ -206,7 +212,8 @@ def run_one(task: dict, instance: str, root: Path, deadline: float | None = None
         verdict, reason = persist_then_verify(run_dir, result, verify)
     record = {"task_id": task["id"], "instance": instance, "verdict": verdict.value, "reason": reason,
               "sample": bool(task.get("sample")), "run_id": result.get("run_id"),
-              "seconds": result.get("seconds")}
+              "seconds": result.get("seconds"), "steps": result.get("steps"), "tokens": result.get("tokens"),
+              "stop_reason": result.get("stop_reason"), "llm_error_code": result.get("llm_error_code")}
     _write(run_dir / "verdict.json", record)
     if mcp is not None and result.get("escalations"):
         _write(run_dir / "cleanup.json", cleanup_escalations(mcp, result))
@@ -274,25 +281,44 @@ def preflight(instance: str) -> dict:
         raise RuntimeError("tools/list returned no tools for this seat")
     me = RestClient(session).raw("/api/auth/me")["id"]
     model = config.env("OPENAI_MODEL", "gpt-4.1")
-    return {"tools": len(tools), "me": me, "model": model, **probe_tool_choice(default_llm("openai"), model)}
+    llm = default_llm("openai")
+    thinking = probe_reasoning_off(llm, model)
+    return {"tools": len(tools), "me": me, "model": model, "thinking": thinking,
+            **probe_tool_choice(llm, model, **thinking["request_extra"])}
 
 
 def execute(plan: list[tuple[dict, str]], root: Path, book: ResultsBook, *, budget: float | None,
-            workers: int = 1, forced_tool_choice: str = "named", clock=time.monotonic) -> list[dict]:
+            workers: int = 1, forced_tool_choice: str = "named", clock=time.monotonic,
+            token_budget: int | None = None, request_extra: dict | None = None) -> list[dict]:
     """Run the plan, keeping results.json current after every task. With workers > 1 the isolated tasks run that
-    many at a time first, then the rest one by one."""
+    many at a time first, then the rest one by one. Under a token budget a task starts only if its whole limit is
+    still free; its limit is held while it runs and what it did not spend is handed back."""
     started, records, lock = clock(), [], threading.Lock()
+    held = [0]          # tokens spent by finished tasks plus the limits of running ones
+    spent_out = [None]  # set once the platform says the run's budget is gone: no later task can succeed
 
     def one(task: dict, instance: str) -> None:
         go, deadline = task_deadline(task, started, budget, clock())
+        cap = None
+        with lock:
+            if spent_out[0]:
+                go, why = False, spent_out[0]
+            elif not go:
+                why = "time budget"
+            elif token_budget is not None:
+                cap = task.get("max_tokens", TASK_TOKENS_DEFAULT)
+                go, why = token_budget - held[0] >= cap, "token budget"
+                if go:
+                    held[0] += cap
         if not go:
-            book.not_run(task, instance, "time budget")
+            book.not_run(task, instance, why)
             book.write()
             return
         book.started(task, instance)
         book.write()
         try:
-            rec = run_one(task, instance, root, deadline=deadline, forced_tool_choice=forced_tool_choice)
+            rec = run_one(task, instance, root, deadline=deadline, forced_tool_choice=forced_tool_choice,
+                          token_budget=cap, request_extra=request_extra)
         except Exception:
             # A task that cannot even start is unevaluated, and must not take the rest of the run with it.
             tb = traceback.format_exc()
@@ -302,9 +328,13 @@ def execute(plan: list[tuple[dict, str]], root: Path, book: ResultsBook, *, budg
                    "run_id": None, "seconds": None}
         with lock:
             records.append(rec)
+            if cap is not None:
+                held[0] += ((rec.get("tokens") or {}).get("total") or 0) - cap
+            if rec.get("llm_error_code") in NO_CREDIT:
+                spent_out[0] = f"the platform's LLM budget is used up ({rec['llm_error_code']})"
         book.record(task, instance, rec)
         book.write()
-        print(f"{rec['verdict']:12} {instance:10} {task['id']}  {rec['reason'][:100]}", flush=True)
+        print(f"{rec['verdict']:12} {instance:10} {task['id']}  {diagnostics(rec)}  {rec['reason'][:100]}", flush=True)
 
     serial = plan
     if workers > 1:
@@ -340,6 +370,10 @@ def main() -> int:
     ap.add_argument("--include-samples", action="store_true")
     ap.add_argument("--workers", type=int, default=1,
                     help="run read-only tasks this many at a time; tasks that write or escalate always run alone")
+    ap.add_argument("--platform-set", action="store_true",
+                    help='only tasks marked "platform": true, the set sized for the harness runner\'s token budget')
+    ap.add_argument("--token-budget", type=int, default=None,
+                    help="LLM tokens this run may spend; a task starts only if its max_tokens still fits")
     args = ap.parse_args()
 
     book = ResultsBook(Path.cwd() / RESULTS_NAME, label=args.instance)
@@ -360,12 +394,14 @@ def main() -> int:
     book.label = ", ".join(sorted(allowed))
 
     tasks = [t for t in load_tasks(args.include_samples) if not args.task or t["id"] in args.task]
+    if args.platform_set:
+        tasks = [t for t in tasks if t.get("platform")]
     plan = order_plan([(t, i) for t in tasks for i in t.get("instances", sorted(config.INSTANCES)) if i in allowed])
     for task, instance in plan:
         book.plan(task, instance)
     book.write()  # every planned task is on file before the first one starts
 
-    choice = "named"
+    choice, request_extra = "named", {}
     if platform:
         try:
             pre = preflight(platform["instance"])
@@ -375,9 +411,13 @@ def main() -> int:
             book.write()
             print(f"preflight failed: {type(e).__name__}: {e}")
             return 0
-        choice = pre["mode"]
-        book.note = (f"model {pre['model']}, tool_choice {pre['mode']}"
-                     f"{'' if pre['tool_called'] else ' (accepted, not honoured)'}, {pre['tools']} MCP tools")
+        choice, request_extra = pre["mode"], pre["thinking"]["request_extra"]
+        honoured = "" if pre["tool_called"] else " (accepted, not honoured)"
+        probe = pre["thinking"]
+        thinking = "thinking: no off switch accepted" if not probe["setting"] else \
+            f"thinking: {probe['setting']} ({probe['tokens']['completion']} completion tokens to say ok)"
+        book.note = f"model {pre['model']}, tool_choice {pre['mode']}{honoured}, {thinking}, {pre['tools']} MCP tools"
+        print("preflight thinking probe: " + "; ".join(probe["tried"]), flush=True)
         print(f"preflight: {book.note}", flush=True)
 
     budget = budget_seconds(bool(platform))
@@ -385,7 +425,8 @@ def main() -> int:
         _start_watchdog(budget + WATCHDOG_GRACE_SECONDS, book)
 
     root = _new_run_root(config.ROOT / "runs")
-    records = execute(plan, root, book, budget=budget, workers=args.workers, forced_tool_choice=choice)
+    records = execute(plan, root, book, budget=budget, workers=args.workers, forced_tool_choice=choice,
+                      token_budget=args.token_budget, request_extra=request_extra)
 
     scored = [r for r in records if not r["sample"]]
     summary = {"runs": records, "approved": sum(r["verdict"] == "approve" for r in scored),

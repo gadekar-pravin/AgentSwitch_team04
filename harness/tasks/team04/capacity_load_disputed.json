@@ -6,6 +6,7 @@
     "keystone"
   ],
   "mode": "dry_run",
+  "platform": true,
   "params": {},
   "prompt": "How loaded is the shop over the next three weeks, and is any workstation over its capacity?",
   "verifier": "harness.verifiers.team04:capacity_load_disputed",

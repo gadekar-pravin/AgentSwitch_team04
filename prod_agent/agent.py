@@ -211,7 +211,9 @@ def _mistyped(args: dict) -> list[str]:
     return wrong
 
 
-NO_CREDIT = {"insufficient_quota", "credit_balance_exhausted"}
+# budget_exhausted: AgentSwitch's harness runner gives each submission one LLM token budget, shared by every
+# instance it runs, and answers 429 with this code once it is spent (2026-10-12: 304,284 tokens, then this).
+NO_CREDIT = {"insufficient_quota", "credit_balance_exhausted", "budget_exhausted"}
 
 
 def _rate_limited(exc: Exception) -> bool:
@@ -252,11 +254,55 @@ def _fn(name, description, properties=None, required=None):
         "type": "object", "properties": properties or {}, "required": required or []}}}
 
 
-def probe_tool_choice(llm, model: str) -> dict:
+def _usage_tokens(resp) -> dict:
+    usage = getattr(resp, "usage", None)
+    return {k: getattr(usage, f"{k}_tokens", 0) or 0 for k in ("prompt", "completion", "total")}
+
+
+# Ways to ask a model not to think, most standard first. DeepSeek V4.1 Flash, the harness runner's model on
+# 2026-10-12, thinks at effort 50 unless told otherwise, and its thinking is billed against the run's token budget.
+# Which of these an OpenAI-compatible host honours is not documented, and a host may accept a field and ignore it,
+# so the probe measures rather than trusts.
+THINKING_OFF = (
+    ("reasoning_effort none", {"reasoning_effort": "none"}),
+    ("reasoning_effort low", {"reasoning_effort": "low"}),
+    ("thinking disabled", {"extra_body": {"thinking": {"type": "disabled"}}}),
+    ("chat_template thinking false", {"extra_body": {"chat_template_kwargs": {"thinking": False}}}),
+)
+# Replying "ok" takes a handful of completion tokens without thinking, and hundreds with it.
+QUIET_COMPLETION_TOKENS = 64
+
+
+def probe_reasoning_off(llm, model: str) -> dict:
+    """The request fields that keep this model's thinking smallest, found with one tiny request per candidate: the
+    first that comes back quiet, else the quietest accepted. A 400/422 means the host does not take that field (OpenAI
+    rejects all four for gpt-4.1); any other error is real and raised."""
+    request = {"model": model, "messages": [{"role": "user", "content": "Reply with the word ok."}]}
+    tried, best = [], None
+    for label, extra in THINKING_OFF:
+        try:
+            resp = llm.chat.completions.create(**request, **extra)
+        except Exception as e:
+            if getattr(e, "status_code", None) not in (400, 422):
+                raise
+            tried.append(f"{label}: rejected")
+            continue
+        tokens = _usage_tokens(resp)
+        tried.append(f"{label}: {tokens['completion']} completion tokens")
+        if best is None or tokens["completion"] < best[2]["completion"]:
+            best = (label, extra, tokens)
+        if tokens["completion"] <= QUIET_COMPLETION_TOKENS:
+            break
+    if best is None:
+        return {"setting": None, "request_extra": {}, "tokens": None, "tried": tried}
+    return {"setting": best[0], "request_extra": best[1], "tokens": best[2], "tried": tried}
+
+
+def probe_tool_choice(llm, model: str, **extra) -> dict:
     """Which form of forced tool call this model accepts, found with one tiny request per form before any task
     spends time on it. Returns the mode, whether the forced call actually came back, and what was rejected."""
     request = {"model": model, "messages": [{"role": "user", "content": "Call the ping tool."}],
-               "tools": [_fn("ping", "Answer a ping.")]}
+               "tools": [_fn("ping", "Answer a ping.")], **extra}
     forms = {"named": {"type": "function", "function": {"name": "ping"}}, "required": "required", "auto": "auto"}
     rejected = []
     for mode in CHOICE_MODES:
@@ -281,7 +327,8 @@ class ProductionAgent:
                  allowed_write_ids: set[str] | None = None, trace: Callable[[dict], None] | None = None,
                  max_steps: int = 20, llm=None, escalate_mode: bool = False, session_title: str | None = None,
                  max_escalations: int = 1, deadline: float | None = None, forced_tool_choice: str = "named",
-                 clock: Callable[[], float] = time.monotonic):
+                 clock: Callable[[], float] = time.monotonic, token_budget: int | None = None,
+                 request_extra: dict | None = None):
         self.mcp = mcp
         # The harness runner supplies one OpenAI-compatible model through OPENAI_* and nothing else.
         self.provider = "openai" if config.on_platform() else \
@@ -305,6 +352,12 @@ class ProductionAgent:
         self.forced_tool_choice = forced_tool_choice
         self.deadline = deadline  # on `clock`; None means no time limit, only the step budget
         self._clock = clock
+        self.token_budget = token_budget  # model tokens this run may spend; None means no limit
+        self.request_extra = request_extra or {}  # fields probe_reasoning_off found keep thinking smallest
+        self.tokens = {"prompt": 0, "completion": 0, "total": 0}
+        self._last_step_tokens = 0
+        self.steps = 0
+        self.llm_error_code: str | None = None
         self._proposals: dict[str, dict] = {}
         self._applied: dict[str, dict] = {}   # wo_id -> the write the platform confirmed
         self._conflicted: dict[str, dict] = {}  # wo_id -> a write the platform refused as stale
@@ -431,7 +484,9 @@ class ProductionAgent:
         """Force the finding into the database before the step budget or the time limit runs out."""
         remaining = self.max_steps - step
         left = self._time_left()
-        short_of_time = left is not None and left < self.WRAP_UP_SECONDS
+        # Room for two more steps of the size of the last one: the forced call, and a retry if a guard refuses it.
+        short_of_time = (left is not None and left < self.WRAP_UP_SECONDS) or \
+            (self.token_budget is not None and self.tokens["total"] + 2 * self._last_step_tokens >= self.token_budget)
         if self.finding is not None:
             return "none" if remaining == 1 or short_of_time else None
         escalation_due = self.escalate_mode and self.needs_person and not self.escalations
@@ -826,9 +881,14 @@ class ProductionAgent:
                 stop_reason = "deadline"
                 self.trace({"type": "deadline", "step": step})
                 break
+            if self.token_budget is not None and self.tokens["total"] >= self.token_budget:
+                stop_reason = "token_budget"
+                self.trace({"type": "token_budget", "step": step, "tokens": dict(self.tokens)})
+                break
             # Strip a provider namespace so OpenRouter's OpenAI model ids retain deterministic sampling.
             sampling_model = self.model.rpartition("/")[2]
             sampling = {"temperature": 0} if sampling_model.startswith(("gpt-4", "gpt-3")) else {}
+            sampling.update(self.request_extra)
             choice = self._wrap_up_choice(step)
             if choice is not None:
                 sampling["tool_choice"] = choice
@@ -844,11 +904,21 @@ class ProductionAgent:
                                             for c in (msg.tool_calls or [])],
                              "usage": usage.model_dump() if usage else None}
                 dumped_message = msg.model_dump(exclude_none=True)
-            except Exception:
+            except Exception as e:
                 # Verifiers grade the database, so a recorded finding must still be scored after an LLM failure.
                 llm_error = traceback.format_exc()
+                self.llm_error_code = getattr(e, "code", None) or getattr(e, "type", None) or type(e).__name__
                 stop_reason = "llm_error"
                 break
+            self.steps += 1
+            spent = _usage_tokens(resp)
+            for key, value in spent.items():
+                self.tokens[key] += value
+            self._last_step_tokens = spent["total"]
+            # A reasoning model returns its thinking beside the answer. Sent back, it would be billed again as prompt
+            # on every later step, and the next step never needs it.
+            for key in ("reasoning_content", "reasoning", "reasoning_details"):
+                dumped_message.pop(key, None)
             self.trace(llm_event)
             messages.append(dumped_message)
             if not msg.tool_calls:
@@ -875,7 +945,8 @@ class ProductionAgent:
         outcome = {"run_id": self.run_id, "stop_reason": stop_reason, "final_answer": final,
                    "finding": self.finding, "finding_record": self.finding_record,
                    "escalations": self.escalations, "agent_session_id": self.session_id, "conflicts": self.conflicts,
-                   "seconds": round(time.time() - started, 1)}
+                   "seconds": round(time.time() - started, 1), "steps": self.steps, "tokens": dict(self.tokens),
+                   "llm_error_code": self.llm_error_code}
         end_event = {"type": "end", **outcome}
         if llm_error is not None:
             end_event["error"] = llm_error

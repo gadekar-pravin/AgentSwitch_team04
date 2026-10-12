@@ -31,6 +31,18 @@ def title_of(task: dict) -> str:
     return first if len(first) <= TITLE_LIMIT else first[:TITLE_LIMIT - 3].rstrip() + "..."
 
 
+def diagnostics(record: dict) -> str:
+    """Steps, tokens and how the loop ended: the panel shows nothing else of a run, and on 2026-10-12 every
+    failure read "no finding recorded" whether the model was refused or simply never recorded one."""
+    if record.get("steps") is None:
+        return ""
+    parts = [f"{record['steps']} steps", f"{((record.get('tokens') or {}).get('total') or 0) / 1000:.1f}k tokens"]
+    stop = record.get("stop_reason")
+    if stop and stop != "final_answer":
+        parts.append(f"stop {stop}" + (f" {record['llm_error_code']}" if record.get("llm_error_code") else ""))
+    return "[" + ", ".join(parts) + "]"
+
+
 def problems(doc) -> list[str]:
     """Everything that would make the runner show "no results" for this file. Empty means it will be read."""
     if not isinstance(doc, dict):
@@ -104,9 +116,10 @@ class ResultsBook:
 
     def record(self, task: dict, instance: str, record: dict) -> None:
         verdict = record["verdict"]
+        seen = diagnostics(record)
         # unevaluated never counts as a pass: only approve is passed=true.
         self._set(self.key(task, instance), title_of(task), verdict, verdict == "approve",
-                  f"{verdict}: {record.get('reason') or ''}")
+                  f"{verdict}{' ' + seen if seen else ''}: {record.get('reason') or ''}")
 
     def not_run(self, task: dict, instance: str, why: str) -> None:
         self._set(self.key(task, instance), title_of(task), "not_run", False, f"{NOT_RUN}: {why}")

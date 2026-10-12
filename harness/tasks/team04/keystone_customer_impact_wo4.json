@@ -5,6 +5,7 @@
     "keystone"
   ],
   "mode": "dry_run",
+  "platform": true,
   "params": {
     "work_order": "WO-2026-00004"
   },
