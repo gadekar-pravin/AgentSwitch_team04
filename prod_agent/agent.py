@@ -366,6 +366,7 @@ class ProductionAgent:
         self._refusal_warned = False
         self._chain_warned = False
         self._escalation_warned = False
+        self._last_call_given = False
         self._rejected_finding_args = {}
         self.escalate_mode = escalate_mode
         self.session_title = session_title or f"team04 production agent run {self.run_id}"
@@ -611,6 +612,29 @@ class ProductionAgent:
                 got.add(code)
         return merged
 
+    def _cite_evidence(self, args: dict) -> dict:
+        """Cite the record diagnose proved each named cause with, where the model left it out.
+
+        Second official run, 2026-10-12: DeepSeek reached its 30k token limit on why_late_wo48_subcontract and
+        filed a forced finding. It still cited the draft subcontracts the verifier requires, but nothing made it.
+        Which record proves a cause is a database fact the loop already holds, like the causes themselves, so it
+        no longer rests on what the model retypes under a forced call. Only causes the finding names are cited,
+        and the model's own entries stay first.
+        """
+        diag = self._diagnosis_for(args.get("work_order"))
+        if not isinstance(diag, dict) or not diag.get("found") or args.get("outcome") not in ("answered", "partial"):
+            return args
+        fields = ("blocking_causes", "contributing_causes", "evidence_records")
+        if any(args.get(k) is not None and not isinstance(args.get(k), list) for k in fields):
+            return args  # the wrong shape is _mistyped's to refuse
+        named = set(args.get("blocking_causes") or []) | set(args.get("contributing_causes") or [])
+        cited = list(args.get("evidence_records") or [])
+        for s in diag.get("signals") or []:
+            record = s.get("record")
+            if s.get("code") in named and isinstance(record, str) and record.strip() and record not in cited:
+                cited.append(record)
+        return {**args, "evidence_records": cited} if cited != (args.get("evidence_records") or []) else args
+
     def _reject_finding(self, args: dict, payload: dict, blame=()) -> dict:
         """Refuse this attempt, but keep what it got right for the retry.
 
@@ -737,6 +761,7 @@ class ProductionAgent:
             args = self._restore_dropped(args)
             args = self._reconcile_rescheduled(args)
             args = self._restore_causes(args)
+            args = self._cite_evidence(args)
             args = self._refuse_missing_order(args)
             mistyped = _mistyped(args)
             if mistyped:
@@ -949,9 +974,16 @@ class ProductionAgent:
                 self.trace({"type": "deadline", "step": step})
                 break
             if self.token_budget is not None and self.tokens["total"] >= self.token_budget:
-                stop_reason = "token_budget"
-                self.trace({"type": "token_budget", "step": step, "tokens": dict(self.tokens)})
-                break
+                if self.finding is None and not self._last_call_given:
+                    # Wrap-up plans room for the forced finding and one retry by the size of the last step, and
+                    # steps grow as the history does: a guard that refuses the forced call can leave the retry
+                    # over the limit. One more step costs less than a run with nothing in the database to grade.
+                    self._last_call_given = True
+                    self.trace({"type": "last_call", "step": step, "tokens": dict(self.tokens)})
+                else:
+                    stop_reason = "token_budget"
+                    self.trace({"type": "token_budget", "step": step, "tokens": dict(self.tokens)})
+                    break
             # Strip a provider namespace so OpenRouter's OpenAI model ids retain deterministic sampling.
             sampling_model = self.model.rpartition("/")[2]
             sampling = {"temperature": 0} if sampling_model.startswith(("gpt-4", "gpt-3")) else {}

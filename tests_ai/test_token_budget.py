@@ -21,7 +21,8 @@ import pytest
 from harness import runner
 from harness.results import ResultsBook, diagnostics
 from prod_agent.agent import ProductionAgent, probe_reasoning_off
-from tests_ai.test_llm_error import FakeMessage, FakeToolCall, isolated_environment, recording_mcp  # noqa: F401
+from tests_ai.test_llm_error import (FakeMessage, FakeToolCall, finding_args, isolated_environment,  # noqa: F401
+                                     recording_mcp)
 
 FORCE_FINDING = {"type": "function", "function": {"name": "record_finding"}}
 
@@ -105,16 +106,43 @@ def test_near_its_token_limit_the_finding_is_forced(recording_mcp):
     assert llm.requests[1]["tool_choice"] == FORCE_FINDING, "10k spent plus two more 10k steps reaches 30k"
 
 
-def test_at_its_token_limit_the_run_stops_without_another_call(recording_mcp):
+def _record_step(total):
+    return _reply(FakeMessage(tool_calls=[FakeToolCall("record_finding", finding_args())]), total)
+
+
+def test_at_its_token_limit_a_run_with_its_finding_stops_without_another_call(recording_mcp):
     mcp, _ = recording_mcp
-    llm = MeteredLLM([_tool_step(6000)])
+    llm = MeteredLLM([_record_step(6000)])
     events = []
 
     out = ProductionAgent(mcp, llm=llm, model="m", token_budget=5000, trace=events.append).run("why late?")
 
-    assert out["stop_reason"] == "token_budget"
+    assert out["stop_reason"] == "token_budget" and out["finding"] is not None
     assert len(llm.requests) == 1
-    assert "token_budget" in [e["type"] for e in events]
+    assert "token_budget" in [e["type"] for e in events] and "last_call" not in [e["type"] for e in events]
+
+
+def test_at_its_token_limit_a_run_with_no_finding_gets_one_forced_last_call(recording_mcp):
+    """The retry wrap-up plans for can land over the limit; ending there leaves nothing to grade."""
+    mcp, _ = recording_mcp
+    llm = MeteredLLM([_tool_step(6000), _record_step(1000)])
+    events = []
+
+    out = ProductionAgent(mcp, llm=llm, model="m", token_budget=5000, trace=events.append).run("why late?")
+
+    assert llm.requests[1]["tool_choice"] == FORCE_FINDING
+    assert out["finding"] is not None and out["stop_reason"] == "token_budget"
+    assert [e["type"] for e in events].count("last_call") == 1
+
+
+def test_the_last_call_is_given_once(recording_mcp):
+    mcp, _ = recording_mcp
+    llm = MeteredLLM([_tool_step(6000), _tool_step(1000)])
+
+    out = ProductionAgent(mcp, llm=llm, model="m", token_budget=5000).run("why late?")
+
+    assert out["stop_reason"] == "token_budget" and out["finding"] is None
+    assert len(llm.requests) == 2
 
 
 def test_a_spent_run_budget_is_reported_by_its_code_and_not_waited_on(recording_mcp):
