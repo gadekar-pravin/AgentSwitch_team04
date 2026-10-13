@@ -230,6 +230,13 @@ def _rate_limited(exc: Exception) -> bool:
 # finding always lands; the harness runner's model is only promised to support tool calls, not forcing one.
 CHOICE_MODES = ("named", "required", "auto")
 
+# Accepting a named tool_choice is not the same as obeying it: deepseek-v4.1-flash through OpenRouter, 2026-10-12
+# (keystone_why_late_wo3), was forced to record_finding and answered in prose instead ("Let me escalate"), which
+# ended the run with nothing in the database to grade. A prose reply to that forced call gets this, once.
+FINDING_NUDGE = ("No finding is recorded yet, and only what record_finding stores counts as this run's answer. "
+                 "Call record_finding now with what you have found. If part of it needs a person or a write this "
+                 "seat cannot make, say so in the finding.")
+
 
 def _choice_rejected(exc: Exception) -> bool:
     """A provider refusing the form of tool_choice, as opposed to anything else that can fail. OpenAI-compatible
@@ -367,6 +374,7 @@ class ProductionAgent:
         self._chain_warned = False
         self._escalation_warned = False
         self._last_call_given = False
+        self._finding_nudged = False
         self._rejected_finding_args = {}
         self.escalate_mode = escalate_mode
         self.session_title = session_title or f"team04 production agent run {self.run_id}"
@@ -499,7 +507,7 @@ class ProductionAgent:
         # 20, so the handover was never raised. Once the refusal has been ignored, force the call.
         if escalation_due and (remaining == 3 or self._escalation_warned or short_of_time):
             return {"type": "function", "function": {"name": "escalate"}}
-        if remaining <= 2 or short_of_time:
+        if remaining <= 2 or short_of_time or self._finding_nudged:
             return {"type": "function", "function": {"name": "record_finding"}}
         return None
 
@@ -1021,6 +1029,14 @@ class ProductionAgent:
             self.trace(llm_event)
             messages.append(dumped_message)
             if not msg.tool_calls:
+                # Only a forced call answered in prose: a plain answer the loop never asked to be a tool call
+                # still ends the run, which tests/test_production.py test 30 requires.
+                forced = isinstance(choice, dict) and choice.get("function", {}).get("name") == "record_finding"
+                if forced and self.finding is None and not self._finding_nudged:
+                    self._finding_nudged = True
+                    messages.append({"role": "user", "content": FINDING_NUDGE})
+                    self.trace({"type": "finding_nudge", "step": step})
+                    continue
                 final, stop_reason = msg.content, "final_answer"
                 break
             # The repeat guard stays serial and in order: its "already called at step N" answer depends on what
