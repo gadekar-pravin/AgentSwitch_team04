@@ -5,6 +5,7 @@
     "keystone"
   ],
   "mode": "dry_run",
+  "platform": true,
   "prompt": "WO-2026-00003 is late. Find out why and reschedule what you can.",
   "verifier": "harness.verifiers.team04:keystone_not_started_cause",
   "checks": "Reports not_started_past_planned_start; claims no applied reschedule; no writes.",

@@ -62,6 +62,8 @@ the task scores `unevaluated` instead of grading against a false premise.
 | `verifier` | `module.path:function` |
 | `max_steps` | optional, default 20 |
 | `max_seconds` | optional, default 240: the task's time limit under a run budget (platform runs). The agent forces its finding 45 s before it. Tasks run cheapest first by this value |
+| `max_tokens` | optional, default 30000: the task's LLM token limit under `--token-budget`. It starts only if this much of the run's share is still free, and the agent forces its finding before reaching it |
+| `platform` | `true` puts the task in the set `--platform-set` runs on AgentSwitch's harness runner, sized so every one can start within the toml's token share |
 
 ## Verifiers
 

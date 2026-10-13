@@ -229,7 +229,9 @@ def _mistyped(args: dict) -> list[str]:
     return wrong
 
 
-NO_CREDIT = {"insufficient_quota", "credit_balance_exhausted"}
+# budget_exhausted: AgentSwitch's harness runner gives each submission one LLM token budget, shared by every
+# instance it runs, and answers 429 with this code once it is spent (2026-10-12: 304,284 tokens, then this).
+NO_CREDIT = {"insufficient_quota", "credit_balance_exhausted", "budget_exhausted"}
 
 
 def _rate_limited(exc: Exception) -> bool:
@@ -245,6 +247,13 @@ def _rate_limited(exc: Exception) -> bool:
 # Ways to make a model call one tool, strongest first. The loop forces record_finding (and escalate) by name so a
 # finding always lands; the harness runner's model is only promised to support tool calls, not forcing one.
 CHOICE_MODES = ("named", "required", "auto")
+
+# Accepting a named tool_choice is not the same as obeying it: deepseek-v4.1-flash through OpenRouter, 2026-10-12
+# (keystone_why_late_wo3), was forced to record_finding and answered in prose instead ("Let me escalate"), which
+# ended the run with nothing in the database to grade. A prose reply to that forced call gets this, once.
+FINDING_NUDGE = ("No finding is recorded yet, and only what record_finding stores counts as this run's answer. "
+                 "Call record_finding now with what you have found. If part of it needs a person or a write this "
+                 "seat cannot make, say so in the finding.")
 
 
 def _choice_rejected(exc: Exception) -> bool:
@@ -280,11 +289,55 @@ def _fn(name, description, properties=None, required=None):
         "type": "object", "properties": properties or {}, "required": required or []}}}
 
 
-def probe_tool_choice(llm, model: str) -> dict:
+def _usage_tokens(resp) -> dict:
+    usage = getattr(resp, "usage", None)
+    return {k: getattr(usage, f"{k}_tokens", 0) or 0 for k in ("prompt", "completion", "total")}
+
+
+# Ways to ask a model not to think, most standard first. DeepSeek V4.1 Flash, the harness runner's model on
+# 2026-10-12, thinks at effort 50 unless told otherwise, and its thinking is billed against the run's token budget.
+# Which of these an OpenAI-compatible host honours is not documented, and a host may accept a field and ignore it,
+# so the probe measures rather than trusts.
+THINKING_OFF = (
+    ("reasoning_effort none", {"reasoning_effort": "none"}),
+    ("reasoning_effort low", {"reasoning_effort": "low"}),
+    ("thinking disabled", {"extra_body": {"thinking": {"type": "disabled"}}}),
+    ("chat_template thinking false", {"extra_body": {"chat_template_kwargs": {"thinking": False}}}),
+)
+# Replying "ok" takes a handful of completion tokens without thinking, and hundreds with it.
+QUIET_COMPLETION_TOKENS = 64
+
+
+def probe_reasoning_off(llm, model: str) -> dict:
+    """The request fields that keep this model's thinking smallest, found with one tiny request per candidate: the
+    first that comes back quiet, else the quietest accepted. A 400/422 means the host does not take that field (OpenAI
+    rejects all four for gpt-4.1); any other error is real and raised."""
+    request = {"model": model, "messages": [{"role": "user", "content": "Reply with the word ok."}]}
+    tried, best = [], None
+    for label, extra in THINKING_OFF:
+        try:
+            resp = llm.chat.completions.create(**request, **extra)
+        except Exception as e:
+            if getattr(e, "status_code", None) not in (400, 422):
+                raise
+            tried.append(f"{label}: rejected")
+            continue
+        tokens = _usage_tokens(resp)
+        tried.append(f"{label}: {tokens['completion']} completion tokens")
+        if best is None or tokens["completion"] < best[2]["completion"]:
+            best = (label, extra, tokens)
+        if tokens["completion"] <= QUIET_COMPLETION_TOKENS:
+            break
+    if best is None:
+        return {"setting": None, "request_extra": {}, "tokens": None, "tried": tried}
+    return {"setting": best[0], "request_extra": best[1], "tokens": best[2], "tried": tried}
+
+
+def probe_tool_choice(llm, model: str, **extra) -> dict:
     """Which form of forced tool call this model accepts, found with one tiny request per form before any task
     spends time on it. Returns the mode, whether the forced call actually came back, and what was rejected."""
     request = {"model": model, "messages": [{"role": "user", "content": "Call the ping tool."}],
-               "tools": [_fn("ping", "Answer a ping.")]}
+               "tools": [_fn("ping", "Answer a ping.")], **extra}
     forms = {"named": {"type": "function", "function": {"name": "ping"}}, "required": "required", "auto": "auto"}
     rejected = []
     for mode in CHOICE_MODES:
@@ -309,7 +362,8 @@ class ProductionAgent:
                  allowed_write_ids: set[str] | None = None, trace: Callable[[dict], None] | None = None,
                  max_steps: int = 20, llm=None, escalate_mode: bool = False, session_title: str | None = None,
                  max_escalations: int = 1, deadline: float | None = None, forced_tool_choice: str = "named",
-                 clock: Callable[[], float] = time.monotonic, require_finding: bool = False):
+                 clock: Callable[[], float] = time.monotonic, token_budget: int | None = None,
+                 request_extra: dict | None = None, require_finding: bool = False):
         self.mcp = mcp
         # The harness runner supplies one OpenAI-compatible model through OPENAI_* and nothing else.
         self.provider = "openai" if config.on_platform() else \
@@ -333,6 +387,12 @@ class ProductionAgent:
         self.forced_tool_choice = forced_tool_choice
         self.deadline = deadline  # on `clock`; None means no time limit, only the step budget
         self._clock = clock
+        self.token_budget = token_budget  # model tokens this run may spend; None means no limit
+        self.request_extra = request_extra or {}  # fields probe_reasoning_off found keep thinking smallest
+        self.tokens = {"prompt": 0, "completion": 0, "total": 0}
+        self._last_step_tokens = 0
+        self.steps = 0
+        self.llm_error_code: str | None = None
         self._proposals: dict[str, dict] = {}
         self._applied: dict[str, dict] = {}   # wo_id -> the write the platform confirmed
         self._conflicted: dict[str, dict] = {}  # wo_id -> a write the platform refused as stale
@@ -341,6 +401,8 @@ class ProductionAgent:
         self._refusal_warned = False
         self._chain_warned = False
         self._escalation_warned = False
+        self._last_call_given = False
+        self._finding_nudged = False
         self._rejected_finding_args = {}
         self.escalate_mode = escalate_mode
         self.session_title = session_title or f"team04 production agent run {self.run_id}"
@@ -361,6 +423,8 @@ class ProductionAgent:
         # Reads REPEAT_GUARDED already promises are "still current" for the rest of the run, kept so
         # propose_reschedule does not re-run a diagnosis and a BOM walk the model has already paid for.
         self._reads: dict[tuple[str, str], dict] = {}
+        self._diagnoses: dict[str, dict] = {}  # by reference, number and id, upper-cased
+        self._missing: set[str] = set()  # references a lookup this run proved name no work order, upper-cased
         self.llm = llm if llm is not None else default_llm(self.provider)
 
     # ------------------------------------------------------------------ tools
@@ -465,7 +529,9 @@ class ProductionAgent:
         """Force the finding into the database before the step budget or the time limit runs out."""
         remaining = self.max_steps - step
         left = self._time_left()
-        short_of_time = left is not None and left < self.WRAP_UP_SECONDS
+        # Room for two more steps of the size of the last one: the forced call, and a retry if a guard refuses it.
+        short_of_time = (left is not None and left < self.WRAP_UP_SECONDS) or \
+            (self.token_budget is not None and self.tokens["total"] + 2 * self._last_step_tokens >= self.token_budget)
         if self.finding is not None:
             return "none" if remaining == 1 or short_of_time else None
         escalation_due = self.escalate_mode and self.needs_person and not self.escalations
@@ -475,7 +541,7 @@ class ProductionAgent:
         # 20, so the handover was never raised. Once the refusal has been ignored, force the call.
         if escalation_due and (remaining == 3 or self._escalation_warned or short_of_time):
             return {"type": "function", "function": {"name": "escalate"}}
-        if remaining <= 2 or short_of_time or self._finding_demanded:
+        if remaining <= 2 or short_of_time or self._finding_nudged or self._finding_demanded:
             return {"type": "function", "function": {"name": "record_finding"}}
         return None
 
@@ -505,6 +571,57 @@ class ProductionAgent:
         merged["rescheduled"] = truth + kept
         return merged
 
+    def _diagnose(self, ref):
+        """One diagnosis per order per run, found again by the reference used, the order's number or its id: the
+        model may diagnose by number and file its finding by id, or name the order in other case."""
+        diag = self._diagnosis_for(ref)
+        if diag is None:
+            diag = domain.diagnose(self.mcp, ref)
+        self._reads["diagnose", ref] = diag
+        if diag.get("found"):
+            wo = diag.get("work_order") or {}
+            for key in (ref, wo.get("number"), wo.get("id")):
+                if isinstance(key, str) and key.strip():
+                    self._diagnoses[key.strip().upper()] = diag
+        elif isinstance(ref, str) and ref.strip():
+            self._missing.add(ref.strip().upper())
+        return diag
+
+    def _say_missing(self, ref, result):
+        """A lookup that found no such order says so in words the model takes as an instruction, not a fact to
+        dig past. Seen 2026-10-12 on both models: {"found": false} alone, and the model searched on for four or
+        five more steps, ran into its token limit, and filed the forced finding as answered."""
+        if not (isinstance(result, dict) and result.get("found") is False and isinstance(ref, str) and ref.strip()):
+            return result
+        self._missing.add(ref.strip().upper())
+        return {**result, "instruction_for_agent": (
+            f"{ref} does not exist on this instance: no work order has that number or id. Do not search for it "
+            f"another way. Call record_finding with outcome 'refused', work_order '{ref}', is_late null, no causes, "
+            "and a refusal_reason saying the work order does not exist.")}
+
+    def _refuse_missing_order(self, args: dict) -> dict:
+        """A finding about an order this run proved does not exist is a refusal, whatever outcome the model typed.
+
+        The backstop for _say_missing: on 2026-10-12 a forced finding at the token limit came back 'answered' for
+        WO-2026-09999. The lookups are the source of truth here, as the platform's write results are for
+        _reconcile_rescheduled; a refusal invents nothing, so causes, blocked orders and reschedules are cleared.
+        """
+        ref = args.get("work_order")
+        key = ref.strip().upper() if isinstance(ref, str) else ""
+        if not key or key not in self._missing or key in self._diagnoses or args.get("outcome") == "refused":
+            return args
+        self.trace({"type": "finding_corrected", "work_order": ref, "outcome_given": args.get("outcome"),
+                    "outcome_recorded": "refused", "why": "no work order with this reference exists"})
+        return {**args, "outcome": "refused", "is_late": None, "blocking_causes": [], "contributing_causes": [],
+                "potentially_blocked_work_orders": [], "blocked_sales_orders": [], "rescheduled": [],
+                "refusal_reason": args.get("refusal_reason") or f"{ref} does not exist on this instance"}
+
+    def _diagnosis_for(self, ref) -> dict | None:
+        found = self._reads.get(("diagnose", ref))
+        if found is None and isinstance(ref, str):
+            found = self._diagnoses.get(ref.strip().upper())
+        return found
+
     def _restore_causes(self, args: dict) -> dict:
         """Add back causes diagnose returned for this order that the model left out of its finding.
 
@@ -514,7 +631,15 @@ class ProductionAgent:
         already holds diagnose's result, so the model is not the source of which causes exist; it still
         decides blocking versus contributing for the ones it kept, and anything it added stays.
         """
-        diag = self._reads.get(("diagnose", args.get("work_order")))
+        ref = args.get("work_order")
+        diag = self._diagnosis_for(ref)
+        if diag is None and args.get("outcome") in ("answered", "partial") and isinstance(ref, str) and ref.strip():
+            # An answer about an order the run never diagnosed still carries what the database proves: on
+            # 2026-10-12 the model reached its finding through propose_reschedule alone, and recorded none.
+            try:
+                diag = self._diagnose(ref)
+            except Exception:  # a failed read must not cost the finding itself
+                return args
         if not isinstance(diag, dict) or not diag.get("found"):
             return args
         if any(args.get(k) is not None and not isinstance(args.get(k), list) for k in ("blocking_causes", "contributing_causes")):
@@ -528,6 +653,29 @@ class ProductionAgent:
                 merged[key] = list(merged.get(key) or []) + [code]
                 got.add(code)
         return merged
+
+    def _cite_evidence(self, args: dict) -> dict:
+        """Cite the record diagnose proved each named cause with, where the model left it out.
+
+        Second official run, 2026-10-12: DeepSeek reached its 30k token limit on why_late_wo48_subcontract and
+        filed a forced finding. It still cited the draft subcontracts the verifier requires, but nothing made it.
+        Which record proves a cause is a database fact the loop already holds, like the causes themselves, so it
+        no longer rests on what the model retypes under a forced call. Only causes the finding names are cited,
+        and the model's own entries stay first.
+        """
+        diag = self._diagnosis_for(args.get("work_order"))
+        if not isinstance(diag, dict) or not diag.get("found") or args.get("outcome") not in ("answered", "partial"):
+            return args
+        fields = ("blocking_causes", "contributing_causes", "evidence_records")
+        if any(args.get(k) is not None and not isinstance(args.get(k), list) for k in fields):
+            return args  # the wrong shape is _mistyped's to refuse
+        named = set(args.get("blocking_causes") or []) | set(args.get("contributing_causes") or [])
+        cited = list(args.get("evidence_records") or [])
+        for s in diag.get("signals") or []:
+            record = s.get("record")
+            if s.get("code") in named and isinstance(record, str) and record.strip() and record not in cited:
+                cited.append(record)
+        return {**args, "evidence_records": cited} if cited != (args.get("evidence_records") or []) else args
 
     def _reject_finding(self, args: dict, payload: dict, blame=()) -> dict:
         """Refuse this attempt, but keep what it got right for the retry.
@@ -571,14 +719,19 @@ class ProductionAgent:
             rows = domain.list_late_work_orders(self.mcp)
             return {"count": len(rows), "work_orders": rows[:40], "truncated": len(rows) > 40}
         if name == "diagnose_work_order":
-            self._reads["diagnose", ref] = result = domain.diagnose(self.mcp, ref)
-            return result
+            return self._say_missing(ref, self._diagnose(ref))
         if name == "downstream_impact":
             self._reads["downstream", ref] = result = domain.downstream_impact(self.mcp, ref)
-            return result
+            return self._say_missing(ref, result)
         if name == "propose_reschedule":
-            result = domain.propose_reschedule(self.mcp, ref, diag=self._reads.get(("diagnose", ref)),
-                                               down=self._reads.get(("downstream", ref)))
+            diag = self._diagnose(ref)
+            result = domain.propose_reschedule(self.mcp, ref, diag=diag, down=self._reads.get(("downstream", ref)))
+            if result.get("found") and diag.get("found"):
+                # Seen 2026-10-12 on the harness runner's model: asked to "find out why and reschedule", it went
+                # straight here, saw dates but no causes, and recorded WO-2026-00003 late with none at all.
+                found = dict.fromkeys((s["code"], s["blocking"]) for s in diag.get("signals") or [])
+                result = {**result, "causes_found": [{"code": code, "blocking": blocking} for code, blocking in found]}
+            result = self._say_missing(ref, result)
             for p in result.get("proposals", []):
                 self._proposals[p["work_order_id"]] = p
                 if not p.get("writable_by_seat") and p["number"] == (result.get("work_order") or {}).get("number"):
@@ -656,6 +809,8 @@ class ProductionAgent:
             args = self._restore_dropped(args)
             args = self._reconcile_rescheduled(args)
             args = self._restore_causes(args)
+            args = self._cite_evidence(args)
+            args = self._refuse_missing_order(args)
             mistyped = _mistyped(args)
             if mistyped:
                 # A wrong shape reaches the database and takes the verifier down with it, which scores
@@ -885,9 +1040,21 @@ class ProductionAgent:
                 stop_reason = "deadline"
                 self.trace({"type": "deadline", "step": step})
                 break
+            if self.token_budget is not None and self.tokens["total"] >= self.token_budget:
+                if self.finding is None and not self._last_call_given:
+                    # Wrap-up plans room for the forced finding and one retry by the size of the last step, and
+                    # steps grow as the history does: a guard that refuses the forced call can leave the retry
+                    # over the limit. One more step costs less than a run with nothing in the database to grade.
+                    self._last_call_given = True
+                    self.trace({"type": "last_call", "step": step, "tokens": dict(self.tokens)})
+                else:
+                    stop_reason = "token_budget"
+                    self.trace({"type": "token_budget", "step": step, "tokens": dict(self.tokens)})
+                    break
             # Strip a provider namespace so OpenRouter's OpenAI model ids retain deterministic sampling.
             sampling_model = self.model.rpartition("/")[2]
             sampling = {"temperature": 0} if sampling_model.startswith(("gpt-4", "gpt-3")) else {}
+            sampling.update(self.request_extra)
             choice = self._wrap_up_choice(step)
             if choice is not None:
                 sampling["tool_choice"] = choice
@@ -903,15 +1070,35 @@ class ProductionAgent:
                                             for c in (msg.tool_calls or [])],
                              "usage": usage.model_dump() if usage else None}
                 dumped_message = msg.model_dump(exclude_none=True)
-            except Exception:
+            except Exception as e:
                 # Verifiers grade the database, so a recorded finding must still be scored after an LLM failure.
                 llm_error = traceback.format_exc()
+                self.llm_error_code = getattr(e, "code", None) or getattr(e, "type", None) or type(e).__name__
                 stop_reason = "llm_error"
                 break
+            self.steps += 1
+            spent = _usage_tokens(resp)
+            for key, value in spent.items():
+                self.tokens[key] += value
+            self._last_step_tokens = spent["total"]
+            # A reasoning model returns its thinking beside the answer. Sent back, it would be billed again as prompt
+            # on every later step, and the next step never needs it.
+            for key in ("reasoning_content", "reasoning", "reasoning_details"):
+                dumped_message.pop(key, None)
             self.trace(llm_event)
             messages.append(dumped_message)
             if not msg.tool_calls:
-                if (self.require_finding and self.finding is None and not self._finding_demanded
+                # One send-back per run, whichever case triggers it. A prose answer to a forced record_finding gets
+                # FINDING_NUDGE; with require_finding, so does an early reply nothing forced. Without either, a plain
+                # answer still ends the run, which tests/test_production.py test 30 requires.
+                forced = isinstance(choice, dict) and choice.get("function", {}).get("name") == "record_finding"
+                sent_back = self._finding_nudged or self._finding_demanded
+                if forced and self.finding is None and not sent_back:
+                    self._finding_nudged = True
+                    messages.append({"role": "user", "content": FINDING_NUDGE})
+                    self.trace({"type": "finding_nudge", "step": step})
+                    continue
+                if (self.require_finding and self.finding is None and not sent_back
                         and step < self.max_steps - 1):
                     # Seen live 2026-09-30: a correct refusal ended the run with no finding, and verifiers grade
                     # only the finding. Sent back once, with record_finding forced on the next step.
@@ -945,7 +1132,8 @@ class ProductionAgent:
         outcome = {"run_id": self.run_id, "stop_reason": stop_reason, "final_answer": final,
                    "finding": self.finding, "finding_record": self.finding_record,
                    "escalations": self.escalations, "agent_session_id": self.session_id, "conflicts": self.conflicts,
-                   "seconds": round(time.time() - started, 1)}
+                   "seconds": round(time.time() - started, 1), "steps": self.steps, "tokens": dict(self.tokens),
+                   "llm_error_code": self.llm_error_code}
         end_event = {"type": "end", **outcome}
         if llm_error is not None:
             end_event["error"] = llm_error

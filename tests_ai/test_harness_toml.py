@@ -45,5 +45,29 @@ def test_install_pins_the_openai_sdk_and_brings_no_other_vendor_sdk():
     assert not any(sdk in requirements for sdk in ("anthropic", "google-generativeai", "google-genai"))
 
 
+# What the first official run (2026-10-12) spent before every call was refused with budget_exhausted. Both
+# instances share it, and each run's preflight spends a little before any task.
+SUBMISSION_TOKEN_BUDGET = 300_000
+PREFLIGHT_TOKENS = 10_000
+
+
+def test_every_platform_task_can_start_within_its_instances_share():
+    run = SPEC["run"].split()
+    assert "--platform-set" in run and "--token-budget" in run
+    share = int(run[run.index("--token-budget") + 1])
+    platform_tasks = [t for t in runner.load_tasks(False) if t.get("platform")]
+    for instance in SPEC["instances"]:
+        limits = [t.get("max_tokens", runner.TASK_TOKENS_DEFAULT) for t in platform_tasks if instance in t["instances"]]
+        assert limits, f"no platform task on {instance}"
+        assert sum(limits) <= share, f"{instance}: {sum(limits)} tokens of task limits in a {share} share"
+    assert (share + PREFLIGHT_TOKENS) * len(SPEC["instances"]) <= SUBMISSION_TOKEN_BUDGET
+
+
+def test_the_platform_set_only_reads():
+    """No fixture writes and no write or escalation tool, so a task can never leave work for another to trip on."""
+    for task in (t for t in runner.load_tasks(False) if t.get("platform")):
+        assert runner.isolated(task), task["id"]
+
+
 def test_results_json_is_never_committed():
     assert RESULTS_NAME in (ROOT / ".gitignore").read_text(encoding="utf-8").splitlines()

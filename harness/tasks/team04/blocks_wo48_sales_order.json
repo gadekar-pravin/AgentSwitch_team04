@@ -5,6 +5,7 @@
     "suryodaya"
   ],
   "mode": "dry_run",
+  "platform": true,
   "prompt": "What does the delay on WO-2026-00048 block downstream? I need the affected customer orders.",
   "verifier": "harness.verifiers.team04:blocks_linked_sales_order",
   "checks": "Sales order linked in DB (SO-2026-00092 on 2026-09-16) is reported; no unlinked sales order invented.",

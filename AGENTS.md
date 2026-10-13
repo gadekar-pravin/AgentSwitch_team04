@@ -75,7 +75,10 @@ harness runner and are shell-only, read from `os.environ` like `AGENT_OFFLINE` b
 runner's `OPENAI_*` win), `Session` uses the given token and base URL for that one instance
 (no login, no `.tokens/`), `LLM_PROVIDER` is ignored, and `harness.runner` runs a preflight,
 keeps a 27-minute budget (`HARNESS_BUDGET_MINUTES` overrides) and rewrites `results.json`
-after every task. Unset them before running tests; `tests_ai/conftest.py` clears them for
+after every task. Each submission also has one LLM token budget (~300k) shared by both
+instances, so the toml runs `--platform-set --token-budget 130000`: only tasks marked
+`"platform": true`, each started only while its `max_tokens` fits. Adding a platform task
+must keep `tests_ai/test_harness_toml.py` green, which checks the set still fits. Unset them before running tests; `tests_ai/conftest.py` clears them for
 the AI-written tests.
 
 `AGENT_OFFLINE` is the other exception, and it is **shell-only**: putting it in `.env` does nothing.
