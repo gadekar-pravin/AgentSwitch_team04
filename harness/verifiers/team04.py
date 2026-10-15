@@ -683,15 +683,22 @@ def _work_content(cards) -> float:
 
 
 def capacity_load_disputed(ctx: VerifyContext):
-    """The two load figures disagree in the DB, and the finding reports the disagreement, not one figure."""
+    """Both load figures are recorded, and the finding says whether they disagree as the board and the cards do now."""
     cards = [c for c in ctx.rest.list("JobCard") if c.get("status") in OPEN_JOB_CARD]
     if not cards:
         return U, "premise gone: no open job cards on this instance"
     content = _work_content(cards)
-    booked = sum(c.get("time_in_mins") or 0 for c in cards)
-    if not booked or content <= booked * 1.5:
-        # If the platform fixes the scaling, the honest answer changes and this task no longer applies.
-        return U, f"premise gone: work content {content:.0f} no longer exceeds booked {booked:.0f} by 1.5x"
+    # The board's figure is the platform's to compute, so it is read, not rebuilt from the cards. Rebuilt as
+    # sum(time_in_mins), it graded the official run of 2026-10-15 revise on both instances: the board had begun
+    # scaling by for_qty, agreed with the work content to the minute, and the agent rightly said so.
+    try:
+        counts = ctx.capacity_board(21).get("counts") or {}
+    except Exception as e:
+        return U, f"premise gone: the capacity board cannot be read ({e})"
+    booked, available = counts.get("booked_minutes"), counts.get("available_minutes")
+    if not booked or not available:
+        return U, f"premise gone: the capacity board reports booked={booked}, available={available} minutes"
+    disagree = content > booked * 1.5
     f = _finding(ctx)
     if not f:
         return R, "no finding recorded in AgentMemory"
@@ -705,17 +712,23 @@ def capacity_load_disputed(ctx: VerifyContext):
     board_pct, content_pct = capacity.get("board_load_pct"), capacity.get("work_content_load_pct")
     if board_pct is None or content_pct is None:
         return R, (f"finding carries only one load figure (board={board_pct}, work_content={content_pct}); "
-                   "both are required because the board's is understated and ours is not the platform's")
-    if not capacity.get("figures_disagree"):
-        return R, f"the two figures disagree by {content / booked:.0f}x in the database, but the finding does not say so"
-    # The pair must describe THIS shop, not two numbers of the agent's choosing: their ratio is the DB ratio.
+                   "both are required: the board's is the platform's figure and the work content is ours")
     expected = content / booked
+    if bool(capacity.get("figures_disagree")) != disagree:
+        if disagree:
+            return R, f"the two figures disagree by {expected:.0f}x in the database, but the finding does not say so"
+        return R, (f"the board's {booked:.0f} booked minutes match the {content:.0f} minutes of work content, "
+                   "but the finding says the figures disagree")
+    # The pair must describe THIS shop, not two numbers of the agent's choosing: their ratio is the DB ratio.
     reported = content_pct / board_pct if board_pct else None
-    if not reported or abs(reported - expected) > max(0.25 * expected, 1.0):
-        return R, (f"recorded figures imply a {reported:.1f}x gap but the database shows {expected:.1f}x "
+    if not reported or abs(reported - expected) > max(0.25 * expected, 0.25):
+        gap = f"{reported:.1f}x" if reported else "no"
+        return R, (f"recorded figures imply a {gap} gap but the database shows {expected:.1f}x "
                    f"(board {board_pct}%, work content {content_pct}%)")
-    return A, (f"recorded both figures ({board_pct}% board vs {content_pct}% work content) and flagged the "
-               f"{expected:.0f}x disagreement")
+    if disagree:
+        return A, (f"recorded both figures ({board_pct}% board vs {content_pct}% work content) and flagged the "
+                   f"{expected:.0f}x disagreement")
+    return A, f"recorded both figures ({board_pct}% board, {content_pct}% work content) and that they agree"
 
 
 def feasibility_verdict_from_db(ctx: VerifyContext):
