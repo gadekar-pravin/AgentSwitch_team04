@@ -267,3 +267,82 @@ def test_evidence_says_how_each_task_ended(tmp_path):
 
     assert book.doc()["tasks"][0]["evidence"] == \
         "revise [3 steps, 31.5k tokens, stop llm_error budget_exhausted]: no finding recorded in AgentMemory"
+
+
+# Harness review, 2026-10-16: the 12 Oct run put 23 budget stops on file as revise and Keystone's refused preflight
+# as a failure, so the panel read them as the agent's. A stop the platform's budget caused is now on file as not run.
+
+def _spent(**body):
+    return openai.RateLimitError("This run's LLM token budget is used up",
+                                 response=httpx.Response(429, request=httpx.Request("POST", "https://x")), body=body)
+
+
+def test_a_task_the_budget_cut_off_is_not_run_rather_than_revise(monkeypatch, tmp_path):
+    monkeypatch.setattr(runner, "run_one", lambda task, instance, root, **kw: {
+        **_record(task, instance, 2000, code="budget_exhausted"), "verdict": "revise",
+        "reason": "no finding recorded in AgentMemory"})
+    book = ResultsBook(tmp_path / "results.json", "suryodaya")
+
+    records = runner.execute(_plan("a", "b"), tmp_path, book, budget=None, token_budget=None)
+
+    assert [r["verdict"] for r in records] == ["revise"]  # the run's own record keeps what the verifier said
+    first, second = book.doc()["tasks"]
+    assert first["passed"] is False
+    assert first["evidence"] == ("not run: the platform's LLM budget ran out mid-task "
+                                 "[3 steps, 2.0k tokens, stop llm_error budget_exhausted]; "
+                                 "verifier: revise: no finding recorded in AgentMemory")
+    assert second["evidence"] == "not run: the platform's LLM budget is used up (budget_exhausted)"
+    assert book.doc()["summary"] == "suryodaya: 0/2 approved, 0 revise, 0 unevaluated (never a pass), 2 not run"
+    assert book.write() == []
+
+
+def test_a_finding_that_passed_before_the_budget_ran_out_still_counts(monkeypatch, tmp_path):
+    monkeypatch.setattr(runner, "run_one", lambda task, instance, root, **kw:
+                        _record(task, instance, 2000, code="budget_exhausted"))
+    book = ResultsBook(tmp_path / "results.json", "suryodaya")
+
+    runner.execute(_plan("a"), tmp_path, book, budget=None, token_budget=None)
+
+    entry = book.doc()["tasks"][0]
+    assert entry["passed"] is True and entry["evidence"].startswith("approve [")
+
+
+def test_a_revise_after_any_other_llm_error_stays_revise(monkeypatch, tmp_path):
+    monkeypatch.setattr(runner, "run_one", lambda task, instance, root, **kw: {
+        **_record(task, instance, 2000, code="context_length_exceeded"), "verdict": "revise", "reason": "wrong"})
+    book = ResultsBook(tmp_path / "results.json", "suryodaya")
+
+    runner.execute(_plan("a"), tmp_path, book, budget=None, token_budget=None)
+
+    assert book.doc()["tasks"][0]["evidence"].startswith("revise [")
+
+
+@pytest.mark.parametrize(("body", "code"), [
+    ({"type": "insufficient_quota", "code": "budget_exhausted"}, "budget_exhausted"),
+    ({"type": "insufficient_quota", "code": "credit_balance_exhausted"}, "credit_balance_exhausted"),
+    ({"type": "insufficient_quota"}, "insufficient_quota"),
+])
+def test_a_preflight_refused_for_budget_is_not_run_rather_than_failed(tmp_path, body, code):
+    book = ResultsBook(tmp_path / "results.json", "keystone")
+    book.plan({"id": "a"}, "keystone")
+
+    runner.preflight_failed(book, _spent(**body))
+
+    doc = book.doc()
+    assert [t["id"] for t in doc["tasks"]] == ["keystone:a"]
+    assert doc["tasks"][0]["evidence"] == \
+        f"not run: the platform's LLM budget was used up before this instance's preflight ({code})"
+    assert "failed" not in doc["summary"]
+
+
+def test_any_other_preflight_error_is_still_a_failed_preflight(tmp_path):
+    book = ResultsBook(tmp_path / "results.json", "keystone")
+    book.plan({"id": "a"}, "keystone")
+
+    runner.preflight_failed(book, RuntimeError("tools/list returned no tools for this seat"))
+
+    doc = book.doc()
+    assert [t["id"] for t in doc["tasks"]] == ["keystone:a", "keystone:preflight"]
+    assert doc["tasks"][0]["evidence"] == "not run: preflight failed"
+    assert doc["tasks"][1]["evidence"] == "RuntimeError: tools/list returned no tools for this seat"
+    assert "1 failed before any task" in doc["summary"]

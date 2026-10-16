@@ -16,7 +16,7 @@ _spec.loader.exec_module(check_premises)
 
 def test_revise_for_a_run_that_did_nothing_means_the_premise_held():
     assert check_premises.classify(Verdict.REVISE, "no finding recorded in AgentMemory") == "holds"
-    # escalation_raised_for checks the run's own escalation before its finding, and has no premise of its own.
+    # escalation_raised_for checks its premise, then the run's own escalation, before its finding.
     assert check_premises.classify(Verdict.REVISE, "no escalation naming WO-2026-00048 raised by this seat") == "holds"
 
 
