@@ -405,6 +405,15 @@ def test_ask_run_is_served_through_the_adhoc_base(tmp_path):
 
 def test_an_oversized_request_body_is_refused_before_it_is_read(console):
     headers = {"X-Console-Token": console.token, "Content-Type": "application/json"}
-    status, _ = _call(console, "/api/ask", {"instance": "keystone", "text": "x" * 40000, "confirm": "keystone/ask"}, headers)
+    cut_off = (ConnectionAbortedError, ConnectionResetError, BrokenPipeError)
+    try:
+        status, _ = _call(console, "/api/ask", {"instance": "keystone", "text": "x" * 40000, "confirm": "keystone/ask"},
+                          headers)
+    except cut_off + (urllib.error.URLError,) as e:
+        # The server answers 413 and closes without reading the body. On Windows (WinError 10053, seen 2026-10-16)
+        # the client can be cut off while still sending it, and never reads the status: refused all the same.
+        if not isinstance(getattr(e, "reason", e), cut_off):
+            raise
+        status = 413
     assert status == 413
     assert console.procs == []

@@ -428,6 +428,7 @@ class ProductionAgent:
         self._diagnoses: dict[str, dict] = {}  # by reference, number and id, upper-cased
         self._missing: set[str] = set()  # references a lookup this run proved name no work order, upper-cased
         self._numbers: dict[str, str] = {}  # record id -> its number, from every tool result this run read
+        self._unread_lanes: dict[str, str] = {}  # cockpit lane -> the state shop_floor_exceptions said it could not fill
         self.llm = llm if llm is not None else default_llm(self.provider)
 
     # ------------------------------------------------------------------ tools
@@ -700,6 +701,34 @@ class ProductionAgent:
             if isinstance(child, (dict, list)):
                 self._learn_numbers(child, depth + 1)
 
+    # Words in a cockpit lane state that mean the platform could not fill the lane, so the lane is unknown, not clear.
+    UNREAD_LANE_WORDS = ("denied", "forbidden", "error", "fail", "unavailable", "timeout", "unknown")
+
+    def _restore_unread_lanes(self, args: dict) -> dict:
+        """Name in not_visible every cockpit lane shop_floor_exceptions said it could not fill.
+
+        Full harness run, 2026-10-16 (3c8e6e9, gpt-4.1): bottleneck_lanes_reported scored revise on Keystone. The
+        tool's lane_states said shortages and automation_failures were permission_denied, and the finding sent
+        not_visible []. That turns "unknown" into "clear". Which lanes could not be read is the platform's answer,
+        which the loop already holds, like the causes _restore_causes adds back.
+        """
+        if not self._unread_lanes or (args.get("not_visible") is not None and not isinstance(args.get("not_visible"), list)):
+            return args  # nothing unread, or the wrong shape: _mistyped's to refuse
+        entries = list(args.get("not_visible") or [])
+
+        def named(lane):
+            stem = lane.casefold().replace("_", " ")
+            return any(isinstance(e, str) and (stem in e.casefold().replace("_", " ")
+                                               or stem.rstrip("s") in e.casefold().replace("_", " ")) for e in entries)
+
+        added = [f"{lane}: {state} (the exception cockpit could not fill this lane, so it is unknown, not clear)"
+                 for lane, state in self._unread_lanes.items() if not named(lane)]
+        if not added:
+            return args
+        self.trace({"type": "finding_corrected", "work_order": args.get("work_order"),
+                    "why": "unreadable cockpit lanes named as not visible", "added": added})
+        return {**args, "not_visible": entries + added}
+
     # What a model writes in a field it has no value for, when it writes a word instead of JSON null.
     NO_ORDER = {"", "null", "none", "n/a", "na", "nil", "-", "undefined"}
 
@@ -784,6 +813,9 @@ class ProductionAgent:
         if isinstance(result, dict) and result.get("found") is False and args.get("work_order"):
             self.missing_orders.add(args["work_order"])
         self._learn_numbers(result)
+        if name == "shop_floor_exceptions" and isinstance(result, dict) and isinstance(result.get("lane_states"), dict):
+            self._unread_lanes.update((lane, str(state)) for lane, state in result["lane_states"].items()
+                                      if any(word in str(state).casefold() for word in self.UNREAD_LANE_WORDS))
         return result
 
     def _dispatch_tool(self, name: str, args: dict):
@@ -890,6 +922,7 @@ class ProductionAgent:
             args = self._reconcile_rescheduled(args)
             args = self._restore_causes(args)
             args = self._cite_evidence(args)
+            args = self._restore_unread_lanes(args)
             args = self._refuse_missing_order(args)
             mistyped = _mistyped(args)
             if mistyped:

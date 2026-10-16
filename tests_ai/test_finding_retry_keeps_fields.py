@@ -63,7 +63,7 @@ def test_a_wrong_shape_is_not_restored_onto_the_retry():
     refused again, and that guard has no once-only limit, so a run could end with no finding."""
     agent = _agent()
     agent.finding, agent._applied, agent._conflicted, agent._reads, agent._diagnoses = None, {}, {}, {}, {}
-    agent._missing, agent._numbers = set(), {}
+    agent._missing, agent._numbers, agent._unread_lanes = set(), {}, {}
     refused = agent._dispatch("record_finding", {"work_order": "WO-2026-00048",
                                                  "escalations": ["raised it to the plant head"]})
     assert refused["error"] == "these fields have the wrong shape"
