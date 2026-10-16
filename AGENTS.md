@@ -36,6 +36,7 @@ AGENT_TODAY=2026-09-16 python -m pytest tests_ai -v # pin the date or results dr
 python scripts/verify_submission.py                 # full pre-submission checklist
 python scripts/verify_submission.py --offline       # skip network checks
 python scripts/check_results.py                     # results.json in the platform runner's format
+python scripts/check_premises.py --platform-set     # do task premises still hold? reads live tenants; no model, no writes
 ```
 
 A non-empty `AGENT_TODAY` line in `.env` beats the shell (see Environment), so the shell pin above
