@@ -289,6 +289,26 @@ def preflight(instance: str) -> dict:
             **probe_tool_choice(llm, model, **thinking["request_extra"])}
 
 
+def no_credit_code(exc: Exception) -> str | None:
+    """The NO_CREDIT code an LLM refusal carries, `code` before `type` as the agent records it, else None."""
+    for code in (getattr(exc, "code", None), getattr(exc, "type", None)):
+        if isinstance(code, str) and code in NO_CREDIT:
+            return code
+    return None
+
+
+def preflight_failed(book: ResultsBook, exc: Exception) -> None:
+    """Put a preflight that raised on file. 2026-10-12: Suryodaya spent the submission's shared token budget and
+    Keystone's first probe was refused with budget_exhausted. Nothing about Keystone failed, so that is a run
+    that never started, not a failed preflight."""
+    spent = no_credit_code(exc)
+    if spent:
+        book.unfinished(f"the platform's LLM budget was used up before this instance's preflight ({spent})")
+        return
+    book.fail("preflight", PREFLIGHT_TITLE, f"{type(exc).__name__}: {exc}")
+    book.unfinished("preflight failed")
+
+
 def execute(plan: list[tuple[dict, str]], root: Path, book: ResultsBook, *, budget: float | None,
             workers: int = 1, forced_tool_choice: str = "named", clock=time.monotonic,
             token_budget: int | None = None, request_extra: dict | None = None) -> list[dict]:
@@ -332,9 +352,16 @@ def execute(plan: list[tuple[dict, str]], root: Path, book: ResultsBook, *, budg
             records.append(rec)
             if cap is not None:
                 held[0] += ((rec.get("tokens") or {}).get("total") or 0) - cap
-            if rec.get("llm_error_code") in NO_CREDIT:
+            cut_off = rec.get("llm_error_code") in NO_CREDIT
+            if cut_off:
                 spent_out[0] = f"the platform's LLM budget is used up ({rec['llm_error_code']})"
-        book.record(task, instance, rec)
+        if cut_off and rec["verdict"] != Verdict.APPROVE.value:
+            # The model was refused mid-task, so the verifier graded a run the agent never finished: 2026-10-12 put
+            # 23 budget stops on file as revise. A finding that landed and passed first still counts as approve.
+            book.not_run(task, instance, f"the platform's LLM budget ran out mid-task {diagnostics(rec)}; "
+                                         f"verifier: {rec['verdict']}: {rec.get('reason') or ''}")
+        else:
+            book.record(task, instance, rec)
         book.write()
         print(f"{rec['verdict']:12} {instance:10} {task['id']}  {diagnostics(rec)}  {rec['reason'][:100]}", flush=True)
 
@@ -418,8 +445,7 @@ def main() -> int:
         try:
             pre = preflight(platform["instance"])
         except Exception as e:
-            book.fail("preflight", PREFLIGHT_TITLE, f"{type(e).__name__}: {e}")
-            book.unfinished("preflight failed")
+            preflight_failed(book, e)
             book.write()
             print(f"preflight failed: {type(e).__name__}: {e}")
             return 0
