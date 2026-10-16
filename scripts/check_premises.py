@@ -10,10 +10,13 @@ fixture pickers, and calls each verifier as if the run had done nothing. A verif
 grades (harness/verifiers/team04.py); one that reads the finding first would report a gone premise as "holds".
 The verdict says which:
 
-  holds    revise: the verifier passed its premise checks and found nothing done, as it should
+  holds    revise: none of the premises the verifier checks has gone, and it found nothing done, as it should
   GONE     unevaluated: the task would score 0 now; fix or swap it before submitting
   skip     the task's fixture writes work orders, so it cannot be checked without writing
   OTHER    approve for a run that did nothing (the task no longer tests anything), or an error; printed in full
+
+A premise no verifier checks cannot show up here: escalation_raised_for never checks that an assignee exists, so
+that task reads "holds" even on an instance where no escalation could be assigned.
 
 It reads the shared tenants, so it needs their passwords in .env like any run. It writes nothing there.
 Exits 1 if any checked premise is GONE or OTHER.
