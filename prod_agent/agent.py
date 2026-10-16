@@ -23,7 +23,7 @@ How you work:
 - For "what does it block": run downstream_impact. Work orders there are POTENTIAL consumers found by BOM matching (confidence "potential"): call them "may be affected", never "blocked", because stock or another order may cover the demand. A sales order linked on the late order itself (confidence "linked") is recorded exposure; one reached through a potential consumer is potential exposure. Report customer, delivery date and value. Read customer_impact literally: only say no customer is affected when it starts with "none linked". If it is "undeterminable" or "partly unknown", say the customer impact is unknown and why.
 - For "can we take/finish this order by <date>": run order_feasible_by. Report its verdict verbatim. The verdict is never "yes": the platform models no work calendar and no labour capacity, so committing a date would be inventing one. Give the remaining work content in hours, the blockers, and say plainly what is missing. Put the verdict, the date asked and the remaining work content hours in record_finding's feasibility field, and the blockers in blocking_causes with their record numbers in evidence_records: only what you record there counts.
 - For shop load or "are we overloaded": run capacity_outlook. It returns TWO load figures. When board_understates_load is true they disagree, and you must report BOTH and say they disagree: the capacity board's own figure, and the work content in the same job cards computed as time_in_mins x for_qty (the platform's own OEE basis). Never present one as the answer. When board_understates_load is false the board agrees with the work content: say so, and set figures_disagree false. Say which workstations are over declared capacity on the work-content figure, and, only when the board understates, that the board does not show them. Put both figures in record_finding's capacity field (board_load_pct, work_content_load_pct, figures_disagree = board_understates_load): only what you record there counts.
-- For "where is the shop floor stuck": run shop_floor_exceptions. Report per lane with record numbers. Check lane_states: a lane the platform could not fill is unknown, NOT clear, and truncated=true means you are seeing part of the list.
+- For "where is the shop floor stuck": run shop_floor_exceptions. Report per lane with record numbers, naming first the examples on open orders (order_open true): a block whose work order has closed is history, not where the floor is stuck now. Check lane_states: a lane the platform could not fill is unknown, NOT clear, and truncated=true means you are seeing part of the list.
 - For questions about what this seat is allowed to do or reach: run seat_policy_conformance. Those rows configure the platform's hosted persona, not this seat, so never cite them as your own permission and never call a divergence a bug. A real limit is one seat_capability confirms.
 - For "reschedule": run propose_reschedule. Only proposals with writable_by_seat=true can be written, and only if apply_reschedule is available. Everything else is a recommendation that needs a person (explain why_not_writable).
 - If apply_reschedule returns changed_underneath, someone else edited that order during this run. Do not retry or re-propose: every further write in this run is refused. Report the conflict, and escalate if escalate is available.
@@ -47,6 +47,8 @@ Final answer: short, plain language, sections Why late / What it blocks / Resche
 # signals whose codes the platform owns, so this checks the shape rather than a fixed list.
 CAUSE_CODE = re.compile(r"^[a-z][a-z0-9_]*$")
 WO_NUMBER = re.compile(r"\bWO-\d{4}-\d{5}\b")
+# What a work-order reference can be: its number, or its id. Anything else in work_order is not one to look up.
+ORDER_REF = re.compile(r"WO-\d{4}-\d{5}|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}", re.IGNORECASE)
 
 RECORD_FINDING_SCHEMA = {
     "type": "object",
@@ -425,6 +427,7 @@ class ProductionAgent:
         self._reads: dict[tuple[str, str], dict] = {}
         self._diagnoses: dict[str, dict] = {}  # by reference, number and id, upper-cased
         self._missing: set[str] = set()  # references a lookup this run proved name no work order, upper-cased
+        self._numbers: dict[str, str] = {}  # record id -> its number, from every tool result this run read
         self.llm = llm if llm is not None else default_llm(self.provider)
 
     # ------------------------------------------------------------------ tools
@@ -633,7 +636,10 @@ class ProductionAgent:
         """
         ref = args.get("work_order")
         diag = self._diagnosis_for(ref)
-        if diag is None and args.get("outcome") in ("answered", "partial") and isinstance(ref, str) and ref.strip():
+        # Only a value shaped like an order reference is looked up: a lookup that finds nothing marks the reference
+        # missing, and _refuse_missing_order then files the answer as a refusal (2026-10-16, work_order "null").
+        if (diag is None and args.get("outcome") in ("answered", "partial") and isinstance(ref, str)
+                and ORDER_REF.fullmatch(ref.strip())):
             # An answer about an order the run never diagnosed still carries what the database proves: on
             # 2026-10-12 the model reached its finding through propose_reschedule alone, and recorded none.
             try:
@@ -677,6 +683,76 @@ class ProductionAgent:
                 cited.append(record)
         return {**args, "evidence_records": cited} if cited != (args.get("evidence_records") or []) else args
 
+    def _learn_numbers(self, value, depth: int = 0) -> None:
+        """Remember the number of every record a tool result gave beside its id, for _numbers_not_ids."""
+        if depth > 8:  # tool results nest a few levels; a deeper one is not a record list
+            return
+        if isinstance(value, dict):
+            rid, number = value.get("id"), value.get("number")
+            if isinstance(rid, str) and isinstance(number, str) and rid.strip() and number.strip() and rid != number:
+                self._numbers.setdefault(rid.strip(), number.strip())
+            children = value.values()
+        elif isinstance(value, list):
+            children = value
+        else:
+            return
+        for child in children:
+            if isinstance(child, (dict, list)):
+                self._learn_numbers(child, depth + 1)
+
+    # What a model writes in a field it has no value for, when it writes a word instead of JSON null.
+    NO_ORDER = {"", "null", "none", "n/a", "na", "nil", "-", "undefined"}
+
+    def _no_placeholder_order(self, args: dict) -> dict:
+        """A work_order of "null", the word, is no work order.
+
+        Platform-model rehearsal, 2026-10-16 (deepseek-v4.1-flash): capacity_load_disputed, a question about no
+        order, recorded work_order "null". _restore_causes then looked up an order called "null" and found none,
+        and _refuse_missing_order filed a correct load answer as a refusal, scored revise. Nothing was asked
+        about an order, so there was none to look up.
+        """
+        ref = args.get("work_order")
+        if not (isinstance(ref, str) and ref.strip().lower() in self.NO_ORDER):
+            return args
+        self.trace({"type": "finding_corrected", "work_order": None, "why": f"work_order {ref!r} names no order"})
+        return {**args, "work_order": None}
+
+    # The finding fields that name records. The schema asks for record numbers, and every verifier matches numbers.
+    RECORD_FIELDS = ("blocked_sales_orders", "potentially_blocked_work_orders", "evidence_records")
+
+    def _numbers_not_ids(self, args: dict) -> dict:
+        """File a record by its number where the model copied the record's id instead.
+
+        Full harness run, 2026-10-16 (gpt-4.1): keystone_customer_impact_wo4 scored revise because the finding
+        listed blocked_sales_orders ['ceef0019-805e-4c1e-b934-d68d63f8b7cc'], the id of SO-2026-00003, which
+        downstream_impact had returned beside its number. Which number an id stands for is a fact the loop read,
+        like the causes _restore_causes adds back. Only an id a tool result paired with a number is replaced.
+        """
+        if not self._numbers:
+            return args
+        fixed, replaced = dict(args), {}
+
+        def number(entry):
+            if isinstance(entry, str) and entry.strip() in self._numbers:
+                replaced[entry.strip()] = self._numbers[entry.strip()]
+                return self._numbers[entry.strip()]
+            return entry
+
+        if isinstance(args.get("work_order"), str):
+            fixed["work_order"] = number(args["work_order"])
+        for key in self.RECORD_FIELDS:
+            if isinstance(args.get(key), list):  # absent or the wrong shape: _mistyped's to refuse, not ours to fix
+                deduped = []
+                for entry in map(number, args[key]):
+                    if entry not in deduped:
+                        deduped.append(entry)
+                fixed[key] = deduped
+        if not replaced:
+            return args
+        self.trace({"type": "finding_corrected", "work_order": fixed.get("work_order"),
+                    "why": "record ids filed as their numbers", "replaced": replaced})
+        return fixed
+
     def _reject_finding(self, args: dict, payload: dict, blame=()) -> dict:
         """Refuse this attempt, but keep what it got right for the retry.
 
@@ -707,6 +783,7 @@ class ProductionAgent:
         result = self._dispatch_tool(name, args)
         if isinstance(result, dict) and result.get("found") is False and args.get("work_order"):
             self.missing_orders.add(args["work_order"])
+        self._learn_numbers(result)
         return result
 
     def _dispatch_tool(self, name: str, args: dict):
@@ -808,6 +885,8 @@ class ProductionAgent:
             if self.finding is not None:
                 return {"error": "finding already recorded for this run"}
             args = self._restore_dropped(args)
+            args = self._no_placeholder_order(args)
+            args = self._numbers_not_ids(args)
             args = self._reconcile_rescheduled(args)
             args = self._restore_causes(args)
             args = self._cite_evidence(args)

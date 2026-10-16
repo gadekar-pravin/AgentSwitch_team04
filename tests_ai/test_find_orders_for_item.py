@@ -73,10 +73,17 @@ def test_late_orders_come_first_most_overdue_first():
 def test_the_schedule_verdict_also_makes_an_order_late():
     """Same rule as list_late_work_orders: due in the future but projected late still counts."""
     mcp = FakeMcp([order("WO-PROJECTED", "in_progress", "2026-12-01"), order("WO-FINE", "in_progress", "2026-12-05")],
-                  schedule=[{"work_order_id": "id-WO-PROJECTED", "verdict": "late"}])
+                  schedule=[{"work_order_id": "id-WO-PROJECTED", "verdict": "late", "projected_finish": "2026-12-09"}])
     r = domain.find_orders_for_item(mcp, "FG-PLT-0900")
     assert r["open_orders"][0]["number"] == "WO-PROJECTED" and r["open_orders"][0]["is_late"] is True
     assert "only WO-PROJECTED is late" in r["instruction"]
+
+
+def test_a_late_verdict_that_only_ran_out_of_horizon_does_not_make_an_order_late():
+    """2026-10-16, WO-2026-00122: "late" with no projected finish, due long after the 14-day horizon ends."""
+    mcp = FakeMcp([order("WO-FAR", "not_started", "2027-06-12")],
+                  schedule=[{"work_order_id": "id-WO-FAR", "verdict": "late", "projected_finish": None}])
+    assert domain.find_orders_for_item(mcp, "FG-PLT-0900")["open_orders"][0]["is_late"] is False
 
 
 def test_no_open_order_says_so_instead_of_offering_a_closed_one():

@@ -28,7 +28,7 @@ One JSON file per task. The runner picks up every `*.json` under this folder. An
 | `job_card_current_operation_wo105` / `_keystone_wo10` | Suryodaya / Keystone | cites the first unfinished job card and says if it should already have started | JobCard by work order |
 | `downtime_breakdown_top_machine` | both | names the machine with the most breakdown minutes in 90 days (ties accepted) in `evidence_records`, by workstation number or full name as a whole token; `unevaluated` when downtime with no workstation is at least the top machine's | DowntimeEntry, Workstation |
 | `keystone_customer_impact_wo4` | Keystone | reports the linked sales order, invents none | WorkOrder.sales_order_id → SalesOrder |
-| `keystone_stopped_not_late` | Keystone | **corrects a false premise**: told an on-time order is late, records is_late=false | WO planned_end_date, status, finite-schedule verdict |
+| `stopped_not_late` | Suryodaya | **corrects a false premise**: told an on-time order is late, records is_late=false | WO planned_end_date, status, finite-schedule verdict |
 | `complex_partial_material_eta` | Suryodaya | **mixed request**: answers the causes, names PurchaseOrder as not visible for the arrival date, outcome `partial` | causes from the DB, `/api/PurchaseOrder` 403 |
 | `complex_false_downstream_link` | both | **half-false premise**: told the order holds up one it has no BOM link to; must not confirm it | BOM materials, open WorkOrders |
 | `complex_longest_overdue_stopped` | both | **selection by criteria**: the stopped order overdue longest, marked late, causes from the DB | WorkOrder status and planned_end_date |
@@ -51,7 +51,9 @@ A premise tied to a date expires, so pick the record at run time instead of nami
 `keystone_stopped_not_late` replaced `keystone_stopped_not_late_wo75`, which named WO-2026-00075 and began
 failing a correct agent once that order passed its 28 Sep due date. Its `stopped_not_late` fixture picks an
 order that is on time by both the date and the platform's schedule, and returns nothing when none exists, so
-the task scores `unevaluated` instead of grading against a false premise.
+the task scores `unevaluated` instead of grading against a false premise. That is how it moved to Suryodaya on
+16 Oct, renamed from `keystone_stopped_not_late`: Keystone had no order left that qualified, and Suryodaya had
+one.
 
 ## Task fields
 

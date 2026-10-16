@@ -97,9 +97,28 @@ def resolve_work_order(mcp: McpClient, ref: str) -> dict | None:
     return mcp.call("WorkOrder.get", {"id": matches[0]["id"]}) if matches else None
 
 
-def finite_schedule(mcp: McpClient, horizon_days: int = 14) -> dict:
+SCHEDULE_HORIZON_DAYS = 14
+
+
+def finite_schedule(mcp: McpClient, horizon_days: int = SCHEDULE_HORIZON_DAYS) -> dict:
     res = mcp.call("endpoint.manufacturing.finite_schedule", {"horizon_days": horizon_days})
     return res.get("result", res)
+
+
+def _schedule_late(entry: dict | None, due: dt.date | None, today: dt.date,
+                   horizon_days: int = SCHEDULE_HORIZON_DAYS) -> bool:
+    """The schedule's own "late", unless all it means is that the order did not fit inside the horizon asked for.
+
+    Seen 2026-10-16 on Suryodaya: WO-2026-00122, due 2027-06-12, came back "late" with no projected finish and a
+    capacity_ceiling cause at 14 and 30 days, and "on_time", finishing 2026-12-05, at 90. diagnose asks for 14, so it
+    reported is_late=true and the agent agreed with a false "it is late". With no projected finish and a due date
+    after the horizon ends, the scheduler ran out of horizon; it did not find a missed date.
+    """
+    entry = entry or {}
+    if entry.get("verdict") != "late":
+        return False
+    beyond_horizon = due is not None and due > today + dt.timedelta(days=horizon_days)
+    return not (beyond_horizon and entry.get("projected_finish") is None)
 
 
 def seat_entities(mcp: McpClient) -> list[str]:
@@ -198,7 +217,7 @@ def list_late_work_orders(mcp: McpClient) -> list[dict]:
             continue
         due = _date(wo.get("planned_end_date"))
         entry = sched.get(wo["id"], {})
-        if (due and due < today) or entry.get("verdict") == "late":
+        if (due and due < today) or _schedule_late(entry, due, today):
             s = _wo_summary(wo)
             s["days_past_due"] = (today - due).days if due else None
             s["projected_finish"] = entry.get("projected_finish")
@@ -368,7 +387,7 @@ def diagnose(mcp: McpClient, ref: str) -> dict:
         "found": True,
         "work_order": _wo_summary(wo),
         "today": _iso(today),
-        "is_late": bool(status in OPEN_WO and ((due and due < today) or (entry or {}).get("verdict") == "late")),
+        "is_late": bool(status in OPEN_WO and ((due and due < today) or _schedule_late(entry, due, today))),
         "days_past_due": (today - due).days if due and status in OPEN_WO else None,
         "schedule": {k: (entry or {}).get(k) for k in ("verdict", "projected_finish", "days_late")},
         "route_workstations": sorted({op.get("workstation_label") for op in (entry or {}).get("operations", [])} - {None}),
@@ -708,6 +727,34 @@ def order_feasible_by(mcp: McpClient, ref: str, due: str) -> dict:
     }
 
 
+def _block_orders(mcp: McpClient, items: list[dict]) -> dict[str, dict]:
+    """The work order behind each cockpit item, by its record id: number, status and whether it is still open.
+
+    Full harness run, 2026-10-16: asked where the floor is stuck "right now", the agent named the cockpit's first
+    examples, QI-2026-00008/21/34. They are rejected inspections, but on orders that had already closed, while the
+    blocks on open orders (QI-2026-00049, QI-2026-00061) went unnamed. The cockpit lists both alike, so the link
+    is read here, the way diagnose reads it: QualityInspection.reference_id, SubcontractOrder.work_order_id. An
+    item whose record names no work order, or whose entity is neither, is left out rather than guessed.
+    """
+    entities = {it.get("entity") for it in items if it.get("record_id")}
+    links: dict[str, str | None] = {}
+    try:
+        if "QualityInspection" in entities:
+            links.update((q["id"], q.get("reference_id")) for q in mcp.list_all("QualityInspection") if q.get("id"))
+        if "SubcontractOrder" in entities:
+            links.update((s["id"], s.get("work_order_id")) for s in mcp.list_all("SubcontractOrder") if s.get("id"))
+        work_orders = {w["id"]: w for w in mcp.list_all("WorkOrder") if w.get("id")} if links else {}
+    except McpError:
+        return {}  # the cockpit's own view stands, unranked, rather than ranked on a partial read
+    orders = {}
+    for it in items:
+        wo = work_orders.get(links.get(it.get("record_id")))
+        if wo is not None:
+            orders[it["record_id"]] = {"number": wo.get("number"), "status": wo.get("status"),
+                                       "open": wo.get("status") in OPEN_WO}
+    return orders
+
+
 def shop_floor_exceptions(mcp: McpClient, limit: int = 50) -> dict:
     """Where the shop floor is stuck, from the platform's exception cockpit. The charter's second question."""
     if not mcp.has_tool("endpoint.manufacturing.exception_cockpit"):
@@ -715,17 +762,31 @@ def shop_floor_exceptions(mcp: McpClient, limit: int = 50) -> dict:
     res = mcp.call("endpoint.manufacturing.exception_cockpit", {"limit": int(limit), "offset": 0})
     cockpit = res.get("result", res) or {}
     items = cockpit.get("items") or []
+    orders = _block_orders(mcp, items)
+
+    def order_open(it):
+        order = orders.get(it.get("record_id"))
+        return None if order is None else order["open"]
+
     lanes: dict[str, dict] = {}
-    for it in items:
+    # Blocks on open orders first, then ones naming no order, then ones whose order has closed: the examples are
+    # what gets named, and a block on a closed order is history, not where the floor is stuck now. The sort is
+    # stable, so the cockpit's own order holds within each group.
+    for it in sorted(items, key=lambda it: {True: 0, None: 1, False: 2}[order_open(it)]):
         lane = lanes.setdefault(it.get("kind") or "unknown",
                                 {"kind": it.get("kind"), "count": 0, "severities": {}, "examples": []})
         lane["count"] += 1
         sev = it.get("severity") or "unknown"
         lane["severities"][sev] = lane["severities"].get(sev, 0) + 1
+        if orders:
+            lane["on_open_orders"] = lane.get("on_open_orders", 0) + (order_open(it) is True)
         if len(lane["examples"]) < 3:
-            lane["examples"].append({"record": it.get("record_label"), "entity": it.get("entity"),
-                                     "severity": sev, "state": it.get("state"),
-                                     "diagnostic": (it.get("diagnostic") or {}).get("code")})
+            example = {"record": it.get("record_label"), "entity": it.get("entity"), "severity": sev,
+                       "state": it.get("state"), "diagnostic": (it.get("diagnostic") or {}).get("code")}
+            order = orders.get(it.get("record_id"))
+            if order is not None:
+                example.update(work_order=order["number"], order_status=order["status"], order_open=order["open"])
+            lane["examples"].append(example)
     total = cockpit.get("total_items")
     return {
         "available": True, "total_items": total, "returned": len(items),
@@ -893,9 +954,8 @@ def find_orders_for_item(mcp: McpClient, item: str) -> dict:
         if wo.get("item_id") != found["id"] or wo.get("status") not in OPEN_WO:
             continue
         due = _date(wo.get("planned_end_date"))
-        verdict = (sched.get(wo["id"]) or {}).get("verdict")
         s = _wo_summary(wo)
-        s["is_late"] = bool((due and due < today) or verdict == "late")
+        s["is_late"] = bool((due and due < today) or _schedule_late(sched.get(wo["id"]), due, today))
         s["days_past_due"] = (today - due).days if due and due < today else 0
         open_orders.append(s)
     # Late first, most overdue first; then the rest by due date.

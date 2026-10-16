@@ -220,7 +220,7 @@ never run. A verifier read that is too large to trust also scores `unevaluated`:
 
 33 tasks in `harness/tasks/team04/`, **8 of them refusals** (9 are named `refuse_*`, but
 `refuse_escalation_no_assignee_keystone` is an answering task); a full run is 44 runs across both instances
-(the newest committed run, `runs/20261001-092435-266195`, predates the six `complex_*`/`keystone_stopped_not_late`
+(the newest committed run, `runs/20261001-092435-266195`, predates the six `complex_*`/`stopped_not_late`
 tasks and has 36). `harness/verifiers/team04.py` holds 32 verifiers (`current_operation_cited` serves both job-card tasks
 through `params`) plus 30 private helpers.
 
