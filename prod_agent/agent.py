@@ -509,6 +509,7 @@ class ProductionAgent:
         self.finding: dict | None = None
         self.finding_record: dict | None = None
         self._seen_calls: dict[tuple[str, str], int] = {}
+        self._retried_reads: set[tuple[str, str]] = set()
         self.requested_orders: set[str] = set()  # WO numbers named in the request, by _wo_key
         self.missing_orders: set[str] = set()  # refs a work-order tool reported as not found, by _order_key
         # Off by default so the bare loop still stops on the first final answer; the harness and the CLI turn it
@@ -615,6 +616,22 @@ class ProductionAgent:
                           "that result above is still current. Do not call it again.",
                 "instruction": "if the answer needs a record this seat cannot see, say so; "
                                "otherwise use what you have and call record_finding"}
+
+    def _allow_retry(self, name: str, arguments: str | None) -> bool:
+        """A guarded read that failed has no result to be current. Seen 2026-10-18: the platform closed the connection
+        on shop_floor_exceptions after 146 s, the model asked again, the guard answered "that result above is still
+        current", and the run refused a question it could answer. One retry per call; a second failure stands."""
+        if name not in self.REPEAT_GUARDED:
+            return False
+        try:
+            key = (name, json.dumps(json.loads(arguments or "{}"), sort_keys=True))
+        except ValueError:
+            return False
+        if key not in self._seen_calls or key in self._retried_reads:
+            return False
+        del self._seen_calls[key]
+        self._retried_reads.add(key)
+        return True
 
     # Under a deadline, the finding is forced this long before it, which leaves room for the forced call, a refusal
     # from one of record_finding's guards, and the retry.
@@ -1551,9 +1568,12 @@ class ProductionAgent:
                 except ValueError:
                     notes.append(None)
             results = self._invoke_batch(msg.tool_calls, notes)
-            for call, (result, error, seconds, tb) in zip(msg.tool_calls, results):
+            for call, note, (result, error, seconds, tb) in zip(msg.tool_calls, notes, results):
                 if tb is not None:
                     self.trace({"type": "exception", "tool": call.function.name, "traceback": tb})
+                if error is not None and note is None and isinstance(result, dict) \
+                        and self._allow_retry(call.function.name, call.function.arguments):
+                    result["retry"] = "this read failed before returning anything; calling it once more is allowed"
                 self.trace({"type": "tool", "step": step, "name": call.function.name,
                             "arguments": call.function.arguments, "error": error,
                             "seconds": seconds, "result": result})
